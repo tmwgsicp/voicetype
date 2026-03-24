@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.backup
+.env.local
+.venv/
+venv/
+env/
+
+# Runtime data
+data/
+*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model weights (too large for git, download via scripts/export_model.py)
+models/
+*.safetensors
+*.bin
+*.onnx
+*.pt
+
+# Qdrant (binary + runtime data, auto-managed)
+vendor/qdrant/
+
+# Test files
+test_*.py
+*.spec.bak
+
+# Node.js
+node_modules/
+.npm
+
+# Tauri Desktop (not ready for open source yet)
+src-tauri/
+src-ui/
+
+# Internal documentation (not for open source)
+docs/
+READY_TO_OPEN_SOURCE.md
+
+# PyInstaller
+voicetype-server/
+*.spec
+
+# Build scripts (internal use only)
+build.py
+run_server.py
+
+# Generated files
+app-icon.png
+.qdrant-initialized
+*.log
+config.json
+
+# Cleanup script
+clean.ps1
+
+# Temporary/local files
+snapshots/
