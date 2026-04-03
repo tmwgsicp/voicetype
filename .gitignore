@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.backup
+.env.local
+.venv/
+venv/
+env/
+
+# Runtime data
+data/
+*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model weights (download via scripts/download_voiceprint_model.py)
+models/*.onnx
+models/*.tar.bz2
+models/*.bin
+models/*.pt
+models/*.safetensors
+
+# Node.js
+node_modules/
+.npm
+
+# Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Frontend build
+src-ui/dist/
+src-ui/node_modules/
+
+# Logs
+*.log
+logs/
+
+# Temporary
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+
+# Media (for demo/test)
+*.mp4
+*.avi
+*.mov
+
+# Internal docs (not for public release)
+MOBILE_FLUTTER.md
+
