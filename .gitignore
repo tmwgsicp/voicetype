@@ -83,8 +83,3 @@ docs/
 
 # Tauri
 src-tauri/binaries/
-
-# Personal assets (二维码等个人信息)
-assets/qrcode/*.jpg
-assets/qrcode/*.png
-!assets/qrcode/README.md

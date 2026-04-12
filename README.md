@@ -301,8 +301,6 @@ VoiceType 支持三种配置方式(按优先级从低到高):
 | `LLM_MODEL` | LLM 模型名称 | `qwen-turbo` |
 | `ASR_VAD_THRESHOLD` | VAD 语音活动检测阈值 | `0.5` |
 
-详细配置说明请参考 [docs/CONFIG_PRIORITY.md](docs/CONFIG_PRIORITY.md)
-
 ---
 
 ## 推荐配置
@@ -315,8 +313,6 @@ VoiceType 支持三种配置方式(按优先级从低到高):
 ---
 
 ## 打包桌面应用
-
-详细打包指南请参考 [docs/BUILD_GUIDE.md](docs/BUILD_GUIDE.md)
 
 ### 快速打包步骤
 
