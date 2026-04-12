@@ -51,7 +51,7 @@ MODELS = {
     },
     "voiceprint": {
         "name": "speaker_recognition.onnx",
-        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recognition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
         "type": "direct",
         "desc": "声纹识别模型（用于说话人验证，默认）",
         "default": True,
@@ -67,12 +67,17 @@ def download_file(url: str, output_path: Path):
     def report_progress(block_num, block_size, total_size):
         downloaded = block_num * block_size
         percent = min(downloaded * 100 / total_size, 100) if total_size > 0 else 0
-        sys.stdout.write(f"\r  进度: {percent:.1f}%")
+        # 使用 ASCII 字符避免编码问题
+        sys.stdout.write(f"\r  Progress: {percent:.1f}%")
         sys.stdout.flush()
     
-    urllib.request.urlretrieve(url, output_path, reporthook=report_progress)
-    sys.stdout.write("\n")
-    logger.info(f"已下载到: {output_path}")
+    try:
+        urllib.request.urlretrieve(url, output_path, reporthook=report_progress)
+        sys.stdout.write("\n")
+        logger.info(f"Downloaded to: {output_path}")
+    except Exception as e:
+        sys.stdout.write("\n")
+        raise e
 
 
 def extract_archive(archive_path: Path, extract_to: Path, archive_type: str):
