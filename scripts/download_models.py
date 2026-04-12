@@ -51,12 +51,11 @@ MODELS = {
     },
     "voiceprint": {
         "name": "speaker_recognition.onnx",
-        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx.tar.bz2",
-        "type": "tar.bz2",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recognition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
+        "type": "direct",
         "desc": "声纹识别模型（用于说话人验证，默认）",
         "default": True,
-        "category": "voiceprint",
-        "extract_rename": True  # 需要重命名提取的文件
+        "category": "voiceprint"
     }
 }
 
@@ -78,6 +77,10 @@ def download_file(url: str, output_path: Path):
 
 def extract_archive(archive_path: Path, extract_to: Path, archive_type: str):
     """解压压缩包"""
+    if archive_type == "direct":
+        # 直接文件，不需要解压
+        return
+    
     logger.info(f"解压中: {archive_path}")
     
     if archive_type == "tar.bz2":
@@ -143,7 +146,8 @@ def download_models(categories=None, all_models=False):
         model_desc = model_info.get("desc", "")
         
         # 特殊处理声纹模型（单文件）
-        if model_info.get("extract_rename"):
+        if model_type == "direct":
+            # 直接下载，不解压
             model_path = models_dir / model_name
         else:
             model_path = models_dir / model_name
@@ -159,46 +163,40 @@ def download_models(categories=None, all_models=False):
         logger.info(f"描述: {model_desc}")
         logger.info(f"{'='*60}")
         
-        # 下载压缩包
-        archive_name = f"{model_key}_temp.{model_type}"
-        archive_path = models_dir / archive_name
-        
-        try:
-            download_file(model_url, archive_path)
-            extract_archive(archive_path, models_dir, model_type)
+        # 下载文件
+        if model_type == "direct":
+            # 直接下载到目标位置
+            try:
+                download_file(model_url, model_path)
+                logger.info(f"✓ 成功安装: {model_name}\n")
+                success_count += 1
+            except Exception as e:
+                logger.error(f"✗ 下载失败 {model_name}: {e}")
+                if model_path.exists():
+                    model_path.unlink()
+                continue
+        else:
+            # 下载压缩包并解压
+            archive_name = f"{model_key}_temp.{model_type}"
+            archive_path = models_dir / archive_name
             
-            # 特殊处理声纹模型重命名
-            if model_info.get("extract_rename"):
-                # 查找解压出的 .onnx 文件
-                onnx_files = list(models_dir.glob("**/*.onnx"))
-                # 排除已存在的 speaker_recognition.onnx
-                onnx_files = [f for f in onnx_files if f.name != "speaker_recognition.onnx"]
+            try:
+                download_file(model_url, archive_path)
+                extract_archive(archive_path, models_dir, model_type)
                 
-                if onnx_files:
-                    # 重命名为统一名称
-                    onnx_files[0].rename(model_path)
-                    logger.info(f"重命名模型文件: {onnx_files[0].name} -> {model_name}")
-                    
-                    # 清理可能的临时目录
-                    for item in models_dir.iterdir():
-                        if item.is_dir() and "3dspeaker" in item.name.lower():
-                            import shutil
-                            shutil.rmtree(item)
-                            logger.info(f"清理临时目录: {item.name}")
-            
-            # 清理压缩包
-            archive_path.unlink()
-            logger.info(f"清理压缩包: {archive_name}")
-            
-            logger.info(f"✓ 成功安装: {model_name}\n")
-            success_count += 1
-        
-        except Exception as e:
-            logger.error(f"✗ 下载失败 {model_name}: {e}")
-            if archive_path.exists():
+                # 清理压缩包
                 archive_path.unlink()
-            # 继续下载其他模型
-            continue
+                logger.info(f"清理压缩包: {archive_name}")
+                
+                logger.info(f"✓ 成功安装: {model_name}\n")
+                success_count += 1
+            
+            except Exception as e:
+                logger.error(f"✗ 下载失败 {model_name}: {e}")
+                if archive_path.exists():
+                    archive_path.unlink()
+                # 继续下载其他模型
+                continue
     
     # 总结
     logger.info("\n" + "="*60)
