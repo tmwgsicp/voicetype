@@ -2355,6 +2355,108 @@
           "markdownDescription": "Denies the unminimize command without any pre-configured scope."
         },
         {
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-password`\n- `allow-set-password`\n- `allow-delete-password`\n- `allow-get-secret`\n- `allow-set-secret`\n- `allow-delete-secret`\n- `allow-get-or-set-password`\n- `allow-get-or-set-secret`",
+          "type": "string",
+          "const": "keyring:default",
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-password`\n- `allow-set-password`\n- `allow-delete-password`\n- `allow-get-secret`\n- `allow-set-secret`\n- `allow-delete-secret`\n- `allow-get-or-set-password`\n- `allow-get-or-set-secret`"
+        },
+        {
+          "description": "Enables the delete_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-delete-password",
+          "markdownDescription": "Enables the delete_password command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the delete_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-delete-secret",
+          "markdownDescription": "Enables the delete_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_or_set_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-get-or-set-password",
+          "markdownDescription": "Enables the get_or_set_password command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_or_set_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-get-or-set-secret",
+          "markdownDescription": "Enables the get_or_set_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-get-password",
+          "markdownDescription": "Enables the get_password command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-get-secret",
+          "markdownDescription": "Enables the get_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-set-password",
+          "markdownDescription": "Enables the set_password command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:allow-set-secret",
+          "markdownDescription": "Enables the set_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the delete_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-delete-password",
+          "markdownDescription": "Denies the delete_password command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the delete_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-delete-secret",
+          "markdownDescription": "Denies the delete_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_or_set_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-get-or-set-password",
+          "markdownDescription": "Denies the get_or_set_password command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_or_set_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-get-or-set-secret",
+          "markdownDescription": "Denies the get_or_set_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-get-password",
+          "markdownDescription": "Denies the get_password command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-get-secret",
+          "markdownDescription": "Denies the get_secret command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_password command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-set-password",
+          "markdownDescription": "Denies the set_password command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_secret command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyring:deny-set-secret",
+          "markdownDescription": "Denies the set_secret command without any pre-configured scope."
+        },
+        {
           "description": "This permission set configures which\nprocess features are by default exposed.\n\n#### Granted Permissions\n\nThis enables to quit via `allow-exit` and restart via `allow-restart`\nthe application.\n\n#### This default permission set includes:\n\n- `allow-exit`\n- `allow-restart`",
           "type": "string",
           "const": "process:default",

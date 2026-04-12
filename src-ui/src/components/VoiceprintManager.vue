@@ -63,7 +63,7 @@
                       <div class="vp-meta">
                         {{ vp.provider }} · {{ vp.embedding_size }} 维向量
                         <span v-if="vp.enrollment_rounds" class="rounds-badge">
-                          {{ vp.enrollment_rounds }} 轮录入
+                          已录 {{ vp.enrollment_rounds }} 轮
                         </span>
                       </div>
                     </div>
@@ -84,15 +84,15 @@
                       <span class="threshold-value">{{ vp.threshold.toFixed(2) }}</span>
                     </div>
                     <el-slider
-                      :model-value="vp.threshold"
+                      v-model="vp.threshold"
                       :min="0.4"
                       :max="0.8"
                       :step="0.05"
-                      :marks="{ 0.4: '宽松', 0.6: '标准', 0.8: '严格' }"
+                      :marks="{ 0.4: '实战推荐', 0.5: '平衡', 0.6: '严格' }"
                       @change="(val: number) => updateThreshold(vp.speaker_id, val)"
                     />
                     <div class="threshold-hint">
-                      较低阈值：更容易通过，但可能误识别 · 较高阈值：更严格，但可能拒绝本人
+                      推荐 0.40-0.45（实战）· 0.50+ 容易误伤本人 · 太高会拒绝口音变化
                     </div>
                   </div>
                 </div>
@@ -196,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Loading, SuccessFilled } from '@element-plus/icons-vue'
 import { useApi } from '../composables/useApi'
@@ -204,6 +204,7 @@ import { useApi } from '../composables/useApi'
 const api = useApi()
 
 const enabled = ref(false)
+const threshold = ref(0.40)
 const voiceprints = ref<any[]>([])
 const showEnrollDialog = ref(false)
 const enrollStep = ref(0)
@@ -228,10 +229,15 @@ let audioBuffers: Float32Array[] = []
 
 const toggleEnabled = async () => {
   try {
-    await api.post('/api/voiceprint/settings/enable', { enabled: enabled.value })
+    await api.post('/api/voiceprint/settings/enable', { 
+      enabled: enabled.value,
+      threshold: threshold.value,
+      provider: 'local'
+    })
     ElMessage.success(enabled.value ? '声纹识别已启用' : '声纹识别已禁用')
-  } catch (error) {
-    ElMessage.error('设置失败')
+  } catch (error: any) {
+    const errorMsg = error?.response?.data?.detail || error?.message || '设置失败'
+    ElMessage.error(errorMsg)
     enabled.value = !enabled.value
   }
 }
@@ -430,10 +436,27 @@ onMounted(async () => {
   try {
     const settings = await api.get('/api/voiceprint/settings')
     enabled.value = settings.enabled || false
+    threshold.value = settings.threshold || 0.5
   } catch (error) {
     console.error('Failed to load voiceprint settings:', error)
   }
 })
+
+// 监听阈值变化，自动保存
+watch(threshold, async (newValue) => {
+  if (!enabled.value) return  // 仅在启用时保存
+  
+  try {
+    await api.post('/api/voiceprint/settings/enable', {
+      enabled: enabled.value,
+      threshold: newValue,
+      provider: 'local'
+    })
+  } catch (error: any) {
+    console.error('Failed to update threshold:', error)
+  }
+})
+
 </script>
 
 <style scoped>
@@ -635,6 +658,9 @@ onMounted(async () => {
   font-size: var(--font-xs);
   color: var(--text-secondary);
   margin-top: var(--space-sm);
+  line-height: 1.5;
+  word-break: keep-all;
+  white-space: normal;
 }
 
 /* Enrollment Dialog */

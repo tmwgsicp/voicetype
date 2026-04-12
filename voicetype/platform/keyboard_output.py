@@ -34,6 +34,12 @@ def _init_win32():
     global _win32_ready
     if _win32_ready:
         return
+    
+    # macOS没有ctypes.wintypes,必须在函数内导入
+    if sys.platform != "win32":
+        logger.warning("_init_win32 called on non-Windows platform, skipping")
+        return
+    
     import ctypes
     import ctypes.wintypes as w
 
@@ -72,7 +78,7 @@ def _clipboard_paste_win32(text: str) -> bool:
     import ctypes
     import time
 
-    logger.debug("Starting clipboard paste for %d chars: '%s'", len(text), text[:50])
+    logger.info("Clipboard paste START: %d chars: '%s'", len(text), text)
     _init_win32()
 
     CF_UNICODETEXT = 13
@@ -120,18 +126,23 @@ def _clipboard_paste_win32(text: str) -> bool:
             logger.warning("SetClipboardData failed")
             kernel32.GlobalFree(h_mem)
             return False
+        logger.info("SetClipboardData success, data length: %d bytes", len(data))
     finally:
         user32.CloseClipboard()
 
-    time.sleep(0.08)
+    time.sleep(0.12)  # 增加到120ms，确保剪切板完全写入
 
+    logger.info("Simulating Ctrl+V...")
     user32.keybd_event(VK_CONTROL, 0, 0, 0)
+    time.sleep(0.01)
     user32.keybd_event(VK_V, 0, 0, 0)
-    time.sleep(0.02)
+    time.sleep(0.03)  # 增加按键间隔
     user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+    time.sleep(0.01)
     user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
-    time.sleep(0.08)
+    time.sleep(0.1)  # 增加等待时间
+    logger.info("Ctrl+V completed")
     return True
 
 

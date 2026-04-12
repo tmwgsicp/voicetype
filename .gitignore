@@ -1,69 +1,90 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyc
-*.egg-info/
-dist/
+*$py.class
+*.so
+.Python
 build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
 *.egg
-
-# Environment
-.env
-.env.backup
-.env.local
-.venv/
+MANIFEST
 venv/
+ENV/
 env/
+dist/voicetype-server/
 
-# Runtime data
-data/
-*.db
-
-# IDE
-.idea/
+# IDEs
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Model weights (download via scripts/download_voiceprint_model.py)
-models/*.onnx
-models/*.tar.bz2
-models/*.bin
-models/*.pt
-models/*.safetensors
+# Environment
+.env
+.env.local
 
-# Node.js
-node_modules/
-.npm
+# Models (too large for git)
+models/
+!models/.gitkeep
 
-# Tauri
-src-tauri/target/
-src-tauri/Cargo.lock
-
-# Frontend build
-src-ui/dist/
-src-ui/node_modules/
+# User data
+data/
+voiceprints/
+config.json
+voiceprint_settings.json
 
 # Logs
 *.log
 logs/
 
-# Temporary
-*.tmp
-*.temp
-.cache/
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+src-ui/dist/
+src-ui/dist-ssr/
+src-tauri/target/
+src-tauri/build/
+src-tauri/dist/
+portable-package/
+dist/voicetype-server/
+release/
+*.exe
+*.msi
+*.dmg
+*.deb
+*.AppImage
+*.zip
+
+# Test results
+tests/
 .pytest_cache/
+.coverage
+htmlcov/
 
-# Media (for demo/test)
-*.mp4
-*.avi
-*.mov
+# Internal docs (not for public)
+docs/
 
-# Internal docs (not for public release)
-MOBILE_FLUTTER.md
+# Tauri
+src-tauri/binaries/
 
+# Personal assets (二维码等个人信息)
+assets/qrcode/*.jpg
+assets/qrcode/*.png
+!assets/qrcode/README.md

@@ -179,8 +179,6 @@ class LocalVoiceprintService(BaseVoiceprintService):
                 
                 # 获取已有的embedding列表
                 existing_embeddings = existing_data.get("embeddings", [])
-                if "embedding" in existing_data:
-                    existing_embeddings.append(existing_data["embedding"])
                 
                 # 添加新的embedding
                 existing_embeddings.append(embedding.tolist())
@@ -266,12 +264,9 @@ class LocalVoiceprintService(BaseVoiceprintService):
             similarity = self._cosine_similarity(stored_embedding, current_embedding)
             decision = similarity >= threshold
             
-            # 只记录关键信息，减少日志
-            # logger.debug(f"Verify {speaker_id}: similarity={similarity:.2f}, threshold={threshold:.2f}, decision={decision}")
-            
             return VoiceprintResult(
                 success=True,
-                score=float(similarity * 100),
+                score=float(similarity),  # 保持 0-1 范围，不乘100
                 decision=decision,
                 message=f"相似度: {similarity:.2f} (阈值: {threshold:.2f})",
                 provider=self.get_provider_name()

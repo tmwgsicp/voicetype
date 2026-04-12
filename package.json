@@ -6,7 +6,8 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build"
+    "build": "tauri build",
+    "download-models": "python scripts/download_models.py --all"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

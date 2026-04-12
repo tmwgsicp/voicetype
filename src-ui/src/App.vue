@@ -4,6 +4,19 @@
 -->
 <template>
   <div class="container">
+    <!-- 首次启动引导 -->
+    <OnboardingGuide />
+    
+    <!-- 实时状态提示 -->
+    <div class="status-toast" v-if="showStatusToast" :class="statusToastType">
+      <div class="toast-icon">{{ statusToastIcon }}</div>
+      <div class="toast-content">
+        <div class="toast-title">{{ statusToastTitle }}</div>
+        <div class="toast-message">{{ statusToastMessage }}</div>
+      </div>
+      <button class="toast-close" @click="showStatusToast = false">×</button>
+    </div>
+    
     <header>
       <div class="header-top">
         <h1>VoiceType</h1>
@@ -14,10 +27,25 @@
         </a>
       </div>
       <p class="subtitle">AI 语音输入，适用于任何场景</p>
+      
+      <!-- 快速提示 -->
+      <div class="quick-tips">
+        <div class="tip-item">
+          <span class="tip-icon">🎙️</span>
+          <span>按 <kbd>F9</kbd> 开始录音</span>
+        </div>
+        <div class="tip-item">
+          <span class="tip-icon">⏸️</span>
+          <span>停顿 1 秒自动识别</span>
+        </div>
+        <div class="tip-item">
+          <span class="tip-icon">✨</span>
+          <span>AI 自动优化文本</span>
+        </div>
+      </div>
     </header>
 
     <SettingsView v-if="currentTab === 'settings'" />
-    <!-- REMOVED: KnowledgeBaseView -->
 
     <footer>
       <p>
@@ -33,15 +61,55 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { initApi } from './composables/useApi'
+import { useWebSocket } from './composables/useWebSocket'
 import SettingsView from './views/SettingsView.vue'
+import OnboardingGuide from './components/OnboardingGuide.vue'
 
 const currentTab = ref('settings')
-const tabs = [
-  { id: 'settings', label: '配置' },
-]
+const ws = useWebSocket()
+
+// 状态提示
+const showStatusToast = ref(false)
+const statusToastType = ref('info')
+const statusToastTitle = ref('')
+const statusToastMessage = ref('')
+const statusToastIcon = ref('ℹ️')
+
+// WebSocket 消息监听
+ws.on('recording', (data: any) => {
+  if (data.active) {
+    showToast('success', '🎤 开始录音', '请说话，停顿 1 秒自动识别')
+  } else {
+    showToast('info', '⏸️ 录音停止', '按 F9 或点击悬浮窗继续')
+  }
+})
+
+ws.on('error', (data: any) => {
+  showToast('error', '❌ 错误', data.message || '操作失败，请重试')
+})
+
+ws.on('asr_connected', (data: any) => {
+  if (data.connected) {
+    showToast('success', '✅ ASR 已连接', '语音识别服务准备就绪')
+  }
+})
+
+function showToast(type: string, title: string, message: string) {
+  statusToastType.value = type
+  statusToastTitle.value = title
+  statusToastMessage.value = message
+  statusToastIcon.value = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'
+  showStatusToast.value = true
+  
+  // 3秒后自动关闭
+  setTimeout(() => {
+    showStatusToast.value = false
+  }, 3000)
+}
 
 onMounted(async () => {
   await initApi()
+  ws.connect()
 })
 </script>
 
@@ -202,6 +270,126 @@ header h1 { font-size: var(--font-xl); font-weight: 700; letter-spacing: -0.5px;
 footer { text-align: center; padding: var(--space-lg) 0 var(--space-sm); color: var(--text-muted); font-size: var(--font-xs); }
 footer a { color: var(--text-secondary); text-decoration: none; }
 footer a:hover { color: var(--primary-color); }
+
+/* 快速提示 */
+.quick-tips {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.tip-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-primary);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--border-light);
+}
+
+.tip-icon {
+  font-size: 16px;
+}
+
+.tip-item kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-base);
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 11px;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+}
+
+/* 状态提示 Toast */
+.status-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  min-width: 300px;
+  max-width: 400px;
+  background: white;
+  border-radius: var(--radius-large);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  animation: slideIn 0.3s ease-out;
+  z-index: 10000;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.status-toast.success {
+  border-left: 4px solid var(--success-color);
+}
+
+.status-toast.error {
+  border-left: 4px solid var(--error-color);
+}
+
+.status-toast.info {
+  border-left: 4px solid var(--primary-color);
+}
+
+.toast-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  font-size: var(--font-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.toast-message {
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.toast-close:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 </style>
 
 <style>

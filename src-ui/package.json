@@ -1,6 +1,13 @@
 {
   "name": "voicetype-ui",
   "version": "0.1.0",
+  "description": "VoiceType - AI 语音输入工具前端",
+  "author": "tmwgsicp <https://github.com/tmwgsicp>",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tmwgsicp/voicetype"
+  },
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +24,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "element-plus": "^2.13.6",
+    "tauri-plugin-keyring-api": "^0.1.1",
     "vue": "^3.5.0"
   },
   "devDependencies": {

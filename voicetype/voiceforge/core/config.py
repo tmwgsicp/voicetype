@@ -64,16 +64,9 @@ class ExtensionConfig(BaseModel):
 
 class ASRConfig(ExtensionConfig):
     """ASR Extension 配置"""
-    api_key: str = Field(..., description="API Key", min_length=10)
+    api_key: str = Field(default="", description="API Key (本地模式可留空)")
     model: str = Field(default="qwen3-asr-flash-realtime", description="模型名称")
     max_silence_ms: int = Field(default=1200, ge=200, le=10000, description="最大静音时长（毫秒）")
+    vad_threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="VAD 灵敏度阈值 (0.0-1.0)")
     sample_rate: int = Field(default=16000, description="采样率")
     language: str = Field(default="zh", description="语言代码")
-    
-    @field_validator('api_key')
-    @classmethod
-    def validate_api_key(cls, v: str) -> str:
-        """验证 API Key"""
-        if not v or len(v) < 10:
-            raise ValueError('无效的 API Key')
-        return v

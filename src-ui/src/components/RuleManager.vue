@@ -28,7 +28,6 @@
               </span>
             </div>
             <div class="actions-group">
-              <button class="btn btn-sm" @click="showTestDialog = true">测试规则</button>
               <button class="btn btn-sm" @click="showImportDialog = true">导入</button>
               <button class="btn btn-sm" @click="exportRules">导出</button>
               <button class="btn btn-primary" @click="showAddDialog = true">+ 新建规则</button>
@@ -152,32 +151,6 @@
       </div>
     </div>
 
-    <!-- Test Dialog -->
-    <div v-if="showTestDialog" class="dialog-overlay" @click.self="showTestDialog = false">
-      <div class="dialog dialog-wide">
-        <div class="dialog-header">
-          <h3>测试规则</h3>
-          <button class="dialog-close" @click="showTestDialog = false">×</button>
-        </div>
-        <div class="dialog-body">
-          <div class="form-group">
-            <label>测试文本</label>
-            <textarea v-model="testInput" rows="3" placeholder="输入文本测试规则效果..."></textarea>
-          </div>
-          <div v-if="testOutput" class="test-result">
-            <div class="result-label">输出结果:</div>
-            <div class="result-text">{{ testOutput }}</div>
-            <div v-if="testChanged" class="result-hint">✓ 规则已生效</div>
-            <div v-else class="result-hint">未匹配到规则</div>
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn" @click="showTestDialog = false">关闭</button>
-          <button class="btn btn-primary" @click="runTest">运行测试</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Import Dialog -->
     <div v-if="showImportDialog" class="dialog-overlay" @click.self="showImportDialog = false">
       <div class="dialog">
@@ -227,7 +200,6 @@ const rules = ref<Rule[]>([])
 const selectedCategory = ref<string | null>(null)
 const showAddDialog = ref(false)
 const showEditDialog = ref(false)
-const showTestDialog = ref(false)
 const showImportDialog = ref(false)
 
 const formData = ref({
@@ -238,10 +210,6 @@ const formData = ref({
   case_sensitive: false,
   whole_word: false,
 })
-
-const testInput = ref('')
-const testOutput = ref('')
-const testChanged = ref(false)
 
 const importData = ref('')
 const importMerge = ref(true)
@@ -336,22 +304,6 @@ const deleteRule = async (rule: Rule) => {
     await loadRules()
   } catch (error) {
     ElMessage.error('删除失败')
-    console.error(error)
-  }
-}
-
-const runTest = async () => {
-  if (!testInput.value) {
-    ElMessage.warning('请输入测试文本')
-    return
-  }
-
-  try {
-    const data = await api.post('/api/rules/test', { text: testInput.value })
-    testOutput.value = data.output
-    testChanged.value = data.changed
-  } catch (error) {
-    ElMessage.error('测试失败')
     console.error(error)
   }
 }
@@ -868,36 +820,5 @@ input:checked + .toggle-slider:before {
 
 .checkbox-label span {
   line-height: var(--leading-normal);
-}
-
-.test-result {
-  padding: var(--space-md);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-base);
-  border-left: 4px solid var(--success-color);
-  margin-top: var(--space-md);
-}
-
-.result-label {
-  font-size: var(--font-xs);
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-  font-weight: var(--font-semibold);
-}
-
-.result-text {
-  font-size: var(--font-base);
-  margin-bottom: var(--space-sm);
-  line-height: var(--leading-normal);
-  color: var(--text-primary);
-  padding: var(--space-sm);
-  background: var(--bg-primary);
-  border-radius: var(--radius-small);
-}
-
-.result-hint {
-  font-size: var(--font-xs);
-  color: var(--success-color);
-  font-weight: var(--font-semibold);
 }
 </style>

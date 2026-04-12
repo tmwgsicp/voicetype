@@ -47,6 +47,7 @@ mac = ["pyobjc-framework-Cocoa>=10.0"]
 
 [project.scripts]
 voicetype = "voicetype.main:run"
+download-sherpa-models = "scripts.download_sherpa_models:download_models"
 
 [project.urls]
 Homepage = "https://github.com/tmwgsicp/voicetype"

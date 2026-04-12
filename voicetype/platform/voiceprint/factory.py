@@ -76,9 +76,15 @@ class VoiceprintServiceFactory:
             
             elif provider == VoiceprintProvider.LOCAL_ONNX:
                 from .local_service import LocalVoiceprintService
+                from ...utils.path_helper import resolve_model_path
                 
                 model_path = config.get("model_path", "models/speaker_recognition.onnx")
                 storage_dir = config.get("storage_dir", "data/voiceprints")
+                
+                # 解析模型路径
+                model_path = resolve_model_path(model_path)
+                storage_dir = resolve_model_path(storage_dir)
+                
                 sample_rate = config.get("sample_rate", 16000)
                 threshold = config.get("threshold", 0.5)
                 

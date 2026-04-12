@@ -45,23 +45,29 @@ class Microphone:
     def start(self, loop: asyncio.AbstractEventLoop):
         """Start capturing audio. Must be called from the asyncio event loop thread."""
         if self._stream is not None:
+            logger.warning("麦克风已在运行,跳过启动")
             return
 
         self._loop = loop
 
-        self._stream = sd.InputStream(
-            samplerate=self._sample_rate,
-            channels=CHANNELS,
-            dtype=DTYPE,
-            blocksize=self._chunk_samples,
-            device=self._device,
-            callback=self._audio_callback,
-        )
-        self._stream.start()
-        logger.info(
-            "Microphone started (rate=%dHz, chunk=%d samples, device=%s)",
-            self._sample_rate, self._chunk_samples, self._device or "default",
-        )
+        try:
+            self._stream = sd.InputStream(
+                samplerate=self._sample_rate,
+                channels=CHANNELS,
+                dtype=DTYPE,
+                blocksize=self._chunk_samples,
+                device=self._device,
+                callback=self._audio_callback,
+            )
+            self._stream.start()
+            logger.info(
+                "✅ 麦克风启动成功 (采样率=%dHz, 块大小=%d samples, 设备=%s)",
+                self._sample_rate, self._chunk_samples, self._device or "默认",
+            )
+        except Exception as e:
+            logger.error(f"❌ 麦克风启动失败: {e}", exc_info=True)
+            logger.error("   可能原因: 1) 麦克风权限未开启 2) 麦克风设备禁用 3) 驱动问题")
+            raise
 
     def stop(self):
         """Stop capturing audio."""

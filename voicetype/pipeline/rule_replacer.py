@@ -92,24 +92,26 @@ class RuleReplacer:
         self._rules: Dict[str, TermRule] = {}
         self._rules_file = rules_file
         
+        # 首先加载默认规则作为 fallback
+        self._load_default_rules()
+        
+        # 然后尝试加载自定义规则（如果存在且有效）
         if rules_file and rules_file.exists():
-            self.load_rules()
-        else:
-            self._load_default_rules()
+            try:
+                self.load_rules()
+            except Exception as e:
+                # 静默失败，继续使用默认规则
+                logger.debug(f"Could not load custom rules, using defaults: {e}")
     
     def _load_default_rules(self):
-        """Load built-in default rules for common mistakes."""
+        """Load built-in default rules for common tech terms."""
         default_rules = [
+            # 产品名
             ("克劳德", "Claude", "product"),
-            ("克劳德库德", "Claude Code", "product"),
+            # 核心技术术语
             ("用户ID", "user_id", "tech"),
             ("用户艾迪", "user_id", "tech"),
             ("接口", "API", "tech"),
-            ("数据库", "database", "tech"),
-            ("回调", "callback", "tech"),
-            ("代码", "code", "tech"),
-            ("仓库", "repository", "tech"),
-            ("提交", "commit", "tech"),
         ]
         
         for i, (wrong, correct, category) in enumerate(default_rules):
@@ -208,23 +210,24 @@ class RuleReplacer:
     def load_rules(self):
         """Load rules from file."""
         if not self._rules_file or not self._rules_file.exists():
-            logger.warning(f"Rules file not found: {self._rules_file}")
-            self._load_default_rules()
+            # 文件不存在时静默返回，保留默认规则
+            logger.debug(f"Rules file not found: {self._rules_file}, using defaults")
             return
         
         try:
             with open(self._rules_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             
+            # 清空并加载自定义规则
             self._rules.clear()
             for rule_data in data.get("rules", []):
                 rule = TermRule.from_dict(rule_data)
                 self._rules[rule.id] = rule
             
-            logger.info(f"Loaded {len(self._rules)} rules from {self._rules_file}")
+            logger.info(f"Loaded {len(self._rules)} custom rules from {self._rules_file}")
         except Exception as e:
-            logger.error(f"Failed to load rules: {e}")
-            self._load_default_rules()
+            # JSON 格式错误等异常，静默失败，保留默认规则
+            logger.debug(f"Failed to load custom rules: {e}")
     
     def import_rules(self, rules_data: List[dict], merge: bool = True) -> int:
         """

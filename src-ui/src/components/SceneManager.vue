@@ -351,8 +351,9 @@ const saveScene = async () => {
     closeDialog()
     await loadScenes()
   } catch (error: any) {
-    ElMessage.error(error.detail || '保存失败')
-    console.error(error)
+    const message = error?.response?.data?.detail || error?.message || '保存失败'
+    ElMessage.error(message)
+    console.error('保存场景错误:', error)
   }
 }
 
@@ -366,8 +367,9 @@ const deleteScene = async (scene: Scene) => {
     ElMessage.success('场景已删除')
     await loadScenes()
   } catch (error: any) {
-    ElMessage.error(error.detail || '删除失败')
-    console.error(error)
+    const message = error?.response?.data?.detail || error?.message || '删除失败'
+    ElMessage.error(message)
+    console.error('删除场景错误:', error)
   }
 }
 

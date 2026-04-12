@@ -58,6 +58,7 @@ class QwenASRExtension(BaseASRExtension):
         self._api_key: str = self.config.api_key
         self._model: str = self.config.model
         self._max_silence_ms: int = self.config.max_silence_ms
+        self._vad_threshold: float = self.config.vad_threshold
         self._sample_rate: int = self.config.sample_rate
         self._language: str = self.config.language
 
@@ -109,15 +110,15 @@ class QwenASRExtension(BaseASRExtension):
                 },
                 "turn_detection": {
                     "type": "server_vad",
-                    "threshold": 0.0,  # 推荐值：提高VAD灵敏度
+                    "threshold": self._vad_threshold,  # VAD 阈值 (0.0-1.0)，越高越不敏感
                     "silence_duration_ms": self._max_silence_ms,
                 },
             },
         }
         await self._ws.send(json.dumps(session_update))
         logger.info(
-            "[%s] Sent session.update (VAD mode, silence=%dms, lang=%s)",
-            self.config.name, self._max_silence_ms, self._language,
+            "[%s] Sent session.update (VAD mode, threshold=%.2f, silence=%dms, lang=%s)",
+            self.config.name, self._vad_threshold, self._max_silence_ms, self._language,
         )
 
     async def _do_start(self):

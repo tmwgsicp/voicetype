@@ -223,19 +223,3 @@ async def list_categories():
     return {
         "categories": sorted(list(categories))
     }
-
-
-@rule_router.post("/test")
-async def test_rules(text: str):
-    """
-    Test rule replacement on sample text.
-    测试规则替换效果。
-    """
-    replacer = get_rule_replacer()
-    result = replacer.apply(text, add_lock_tags=True)
-    
-    return {
-        "input": text,
-        "output": result,
-        "changed": result != text
-    }

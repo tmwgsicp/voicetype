@@ -30,7 +30,7 @@ from pathlib import Path
 
 from .engine import VoiceTypingEngine
 from .api.routes import router, set_engine
-from .api.config_routes import config_router, set_config
+from .api.config_routes import config_router, set_config, set_engine as set_config_engine
 from .api.rule_routes import rule_router
 from .api.scene_routes import scene_router, set_scene_engine
 from .api.voiceprint_routes import voiceprint_router, set_engine_instance
@@ -38,12 +38,92 @@ from .config import load_config, VoiceTypeConfig
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-    handlers=[logging.StreamHandler(stream=sys.stderr)],
-)
+def setup_logging():
+    """配置日志输出到文件和控制台"""
+    from .config import get_config_dir
+    import logging.handlers
+    
+    log_dir = get_config_dir() / "logs"
+    log_dir.mkdir(exist_ok=True)
+    
+    log_file = log_dir / "voicetype.log"
+    
+    # 创建 RotatingFileHandler (最多5个文件,每个10MB)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+    )
+    
+    # 控制台 handler
+    console_handler = logging.StreamHandler(stream=sys.stderr)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%H:%M:%S"
+        )
+    )
+    
+    # 配置 root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # ✅ 打包环境：额外输出到exe目录 (仅在运行时创建,不在打包时包含)
+    if getattr(sys, 'frozen', False):
+        try:
+            exe_dir = Path(sys.executable).parent
+            install_log = exe_dir / "voicetype-runtime.log"  # 改名避免NSIS扫描
+            
+            install_handler = logging.FileHandler(install_log, encoding='utf-8')
+            install_handler.setLevel(logging.DEBUG)
+            install_handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S"
+                )
+            )
+            root_logger.addHandler(install_handler)
+            
+            print(f"[PACKAGED] Runtime log: {install_log}", file=sys.stderr)
+        except Exception as e:
+            print(f"[PACKAGED] Failed to create runtime log: {e}", file=sys.stderr)
+    
+    logger = logging.getLogger(__name__)
+    
+    # ✅ 启动时输出详细的环境信息
+    logger.info("=" * 70)
+    logger.info("VoiceType Starting")
+    logger.info("=" * 70)
+    logger.info(f"Python Version: {sys.version}")
+    logger.info(f"Platform: {sys.platform}")
+    logger.info(f"Frozen: {getattr(sys, 'frozen', False)}")
+    
+    if getattr(sys, 'frozen', False):
+        logger.info(f"Packaged Mode:")
+        logger.info(f"  sys._MEIPASS: {getattr(sys, '_MEIPASS', 'N/A')}")
+        logger.info(f"  sys.executable: {sys.executable}")
+        logger.info(f"  exe directory: {Path(sys.executable).parent}")
+    
+    logger.info(f"Working Directory: {os.getcwd()}")
+    logger.info(f"__file__: {__file__}")
+    logger.info(f"Config Directory: {get_config_dir()}")
+    logger.info(f"Log File: {log_file}")
+    logger.info("=" * 70)
+    
+    return log_file
+
+setup_logging()
 logger = logging.getLogger(__name__)
 
 engine: VoiceTypingEngine = None
@@ -114,10 +194,17 @@ async def lifespan(app: FastAPI):
         asr_secret_key=config.asr_secret_key,
         asr_model=config.asr_model,
         asr_max_silence_ms=config.asr_max_silence_ms,
+        asr_vad_threshold=config.asr_vad_threshold,
+        voiceprint_threshold=config.voiceprint_threshold,
+        sherpa_model_dir=config.sherpa_model_dir,
+        sherpa_kws_enabled=config.sherpa_kws_enabled,
+        sherpa_kws_model_dir=config.sherpa_kws_model_dir,
+        sherpa_keywords=config.sherpa_keywords,
         hotkey=config.hotkey,
         typing_delay_ms=config.typing_delay_ms,
     )
     set_engine(engine)
+    set_config_engine(engine)  # Set engine for config hot reload
     set_scene_engine(engine)
     set_engine_instance(engine)
     await engine.start()
@@ -131,13 +218,20 @@ async def lifespan(app: FastAPI):
             with open(voiceprint_settings_file, 'r', encoding='utf-8') as f:
                 vp_settings = json.load(f)
                 enabled = vp_settings.get("enabled", False)
+                threshold = vp_settings.get("threshold", 0.5)
                 engine.set_voiceprint_enabled(enabled)
-                logger.info(f"Loaded voiceprint settings: enabled={enabled}")
+                # 更新声纹服务的阈值
+                if hasattr(engine, '_voiceprint_service') and engine._voiceprint_service:
+                    engine._voiceprint_service.threshold = threshold
+                logger.info(f"Loaded voiceprint settings: enabled={enabled}, threshold={threshold}")
         except Exception as e:
             logger.warning(f"Failed to load voiceprint settings: {e}")
 
     logger.info("VoiceType service ready")
-    logger.info("ASR: %s", config.asr_model)
+    if config.asr_provider == "sherpa":
+        logger.info("ASR: Sherpa-ONNX (local, %s)", config.sherpa_model_dir.split('/')[-1])
+    else:
+        logger.info("ASR: %s (%s)", config.asr_model, config.asr_provider)
     logger.info("LLM: %s @ %s", config.llm_model, config.llm_base_url)
     logger.info("Hotkey: %s (toggle recording)", config.hotkey)
     logger.info("Web UI: http://%s:%d/", config.host, config.port)
@@ -146,9 +240,13 @@ async def lifespan(app: FastAPI):
         logger.info("Auto-starting ASR recording...")
         await engine.start_recording()
 
+    # ✅ Tauri 模式: 只由 Tauri 管理托盘,不启动 pystray
     if not _tauri_mode:
+        logger.info("启动系统托盘图标 (standalone mode)")
         tray_thread = threading.Thread(target=_create_tray_icon, args=(config,), daemon=True)
         tray_thread.start()
+    else:
+        logger.info("Tauri 模式: 托盘图标由 Tauri 管理")
 
     yield
 
@@ -207,6 +305,10 @@ def run():
     args = parser.parse_args()
 
     _tauri_mode = args.tauri
+    
+    # ✅ Tauri 模式下不创建托盘图标
+    if _tauri_mode:
+        logger.info("Running in Tauri sidecar mode (托盘图标由 Tauri 管理)")
 
     load_dotenv()
     config = load_config()

@@ -47,19 +47,26 @@ class VoiceTypingPipeline:
         Initialize VoiceTypingPipeline.
         
         Args:
-            llm_api_key: LLM API key (required)
+            llm_api_key: LLM API key (optional, 如果为空则跳过 LLM 处理)
             llm_base_url: LLM API base URL (from config)
             llm_model: LLM model name (from config)
             llm_temperature: LLM temperature (from config, default: 0.3)
             llm_max_tokens: LLM max output tokens (from config, default: 200)
         """
-        self._client = AsyncOpenAI(
-            api_key=llm_api_key,
-            base_url=llm_base_url,
-        )
-        self._model = llm_model
-        self._temperature = llm_temperature
-        self._max_tokens = llm_max_tokens
+        self._llm_enabled = bool(llm_api_key and llm_api_key.strip())
+        
+        if self._llm_enabled:
+            self._client = AsyncOpenAI(
+                api_key=llm_api_key,
+                base_url=llm_base_url,
+            )
+            self._model = llm_model
+            self._temperature = llm_temperature
+            self._max_tokens = llm_max_tokens
+            logger.info("✓ LLM enabled: model=%s, base_url=%s", llm_model, llm_base_url)
+        else:
+            self._client = None
+            logger.warning("✗ LLM disabled: API Key not configured (will output raw ASR text directly)")
 
         self._current_scene: Scene = SCENES["general"]
         self._custom_prompt: Optional[str] = None  # 自定义场景提示词
@@ -129,6 +136,15 @@ class VoiceTypingPipeline:
         # Apply rule replacement BEFORE LLM processing
         text_after_rules = self._rule_replacer.apply(raw_text, add_lock_tags=True)
         
+        # 如果 LLM 未启用，直接输出规则替换后的文本
+        if not self._llm_enabled:
+            # 移除锁定标签（用户不应该看到）
+            final_text = remove_lock_tags(text_after_rules)
+            logger.info("LLM disabled, outputting rule-replaced text: '%s'", final_text)
+            if self._on_final_text:
+                await self._on_final_text(final_text)
+            return
+        
         safety = pre_filter(text_after_rules)
 
         system_prompt = build_system_prompt(
@@ -180,8 +196,10 @@ class VoiceTypingPipeline:
 
         except Exception as e:
             logger.error("LLM processing failed: %s", e)
+            # LLM 失败时输出规则替换后的文本
+            final_text = remove_lock_tags(text_after_rules)
             if self._on_final_text:
-                await self._on_final_text(raw_text)
+                await self._on_final_text(final_text)
 
     async def close(self):
         if self._client:

@@ -14,7 +14,7 @@ from typing import Optional, List
 from pathlib import Path
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel, Field
 
 from ..config import get_config_dir
@@ -90,27 +90,34 @@ async def get_settings():
     # 从配置文件读取持久化状态
     config_file = get_config_dir() / "voiceprint_settings.json"
     enabled = _voiceprint_enabled
+    threshold = 0.5  # 默认阈值
     
     if config_file.exists():
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
                 saved_settings = json.load(f)
                 enabled = saved_settings.get("enabled", False)
+                threshold = saved_settings.get("threshold", 0.5)
         except Exception as e:
             logger.error(f"Failed to load voiceprint settings: {e}")
     
     return {
         "enabled": enabled,
         "provider": "local",
-        "threshold": 0.5
+        "threshold": threshold
     }
 
 
 @voiceprint_router.post("/settings/enable")
 async def set_enabled(settings: VoiceprintSettings):
-    """启用/禁用声纹识别"""
-    global _voiceprint_enabled
+    """启用/禁用声纹识别并更新阈值"""
+    global _voiceprint_enabled, _voiceprint_service
     _voiceprint_enabled = settings.enabled
+    
+    # 更新声纹服务的阈值
+    if _voiceprint_service:
+        _voiceprint_service.threshold = settings.threshold
+        logger.info(f"Updated voiceprint threshold to {settings.threshold}")
     
     # 持久化到配置文件
     config_file = get_config_dir() / "voiceprint_settings.json"
@@ -118,19 +125,28 @@ async def set_enabled(settings: VoiceprintSettings):
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump({
                 "enabled": settings.enabled,
-                "provider": "local",
-                "threshold": 0.5
+                "provider": settings.provider,
+                "threshold": settings.threshold
             }, f, indent=2)
+        logger.info(f"Saved voiceprint settings: enabled={settings.enabled}, threshold={settings.threshold}")
     except Exception as e:
         logger.error(f"Failed to save voiceprint settings: {e}")
+        raise HTTPException(status_code=500, detail=f"保存声纹设置失败: {str(e)}")
     
     # 同步更新 Engine 的状态
     if _engine_instance:
         _engine_instance.set_voiceprint_enabled(_voiceprint_enabled)
+        # 同步阈值到 Engine 的声纹服务
+        if hasattr(_engine_instance, '_voiceprint_service') and _engine_instance._voiceprint_service:
+            _engine_instance._voiceprint_service.threshold = settings.threshold
     
-    logger.info(f"Voiceprint {'enabled' if _voiceprint_enabled else 'disabled'}")
+    logger.info(f"Voiceprint {'enabled' if _voiceprint_enabled else 'disabled'}, threshold={settings.threshold}")
     
-    return {"success": True, "enabled": _voiceprint_enabled}
+    return {
+        "success": True, 
+        "enabled": _voiceprint_enabled,
+        "threshold": settings.threshold
+    }
 
 
 @voiceprint_router.post("/enroll")
@@ -257,8 +273,8 @@ async def delete_voiceprint(speaker_id: str):
         raise HTTPException(status_code=404, detail=result.message)
 
 
-@voiceprint_router.put("/{speaker_id}/threshold")
-async def update_threshold(speaker_id: str, threshold: float):
+@voiceprint_router.post("/{speaker_id}/threshold")
+async def update_threshold(speaker_id: str, threshold: float = Body(..., embed=True)):
     """更新声纹阈值"""
     storage_dir = Path(get_config_dir() / "voiceprints")
     vp_file = storage_dir / f"{speaker_id}.json"

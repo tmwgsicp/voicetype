@@ -14,6 +14,7 @@ numpy>=1.24.0
 
 # Voice recognition (voiceprint/speaker verification - lightweight local solution)
 sherpa-onnx
+pypinyin>=0.55.0  # Required for KWS keyword encoding
 
 # ASR WebSocket client
 websockets>=13.0,<15.0

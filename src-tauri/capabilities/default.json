@@ -20,6 +20,10 @@
     "core:event:default",
     "core:event:allow-emit",
     "core:event:allow-listen",
-    "core:tray:default"
+    "core:tray:default",
+    "keyring:default",
+    "keyring:allow-get-password",
+    "keyring:allow-set-password",
+    "keyring:allow-delete-password"
   ]
 }

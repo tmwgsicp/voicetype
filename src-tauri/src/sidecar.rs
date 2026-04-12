@@ -104,7 +104,47 @@ pub fn spawn_sidecar(handle: &AppHandle, port: u16) -> Result<Child, String> {
             "voicetype-server"
         });
         
+        // ✅ 详细的启动前检查和日志
+        log::info!("=== Python Backend Startup (Production Mode) ===");
+        log::info!("Resource dir: {:?}", resource_dir);
+        log::info!("Backend dir: {:?}", backend_dir);
+        log::info!("Exe path: {:?}", exe_path);
+        log::info!("Exe exists: {}", exe_path.exists());
+        
+        // 列出backend目录内容
+        if backend_dir.exists() {
+            log::info!("Backend directory contents:");
+            match std::fs::read_dir(&backend_dir) {
+                Ok(entries) => {
+                    for entry in entries.take(20) {  // 只显示前20个
+                        if let Ok(entry) = entry {
+                            let path = entry.path();
+                            let is_dir = path.is_dir();
+                            let size = if is_dir {
+                                String::from("<DIR>")
+                            } else {
+                                match std::fs::metadata(&path) {
+                                    Ok(meta) => format!("{} bytes", meta.len()),
+                                    Err(_) => String::from("<?>"),
+                                }
+                            };
+                            log::info!("  - {:?} ({})", path.file_name().unwrap(), size);
+                        }
+                    }
+                }
+                Err(e) => log::error!("Failed to read backend dir: {}", e),
+            }
+        } else {
+            log::error!("Backend directory does not exist!");
+        }
+        
         if !exe_path.exists() {
+            log::error!("Backend exe not found!");
+            log::error!("=== Troubleshooting ===");
+            log::error!("1. Check if PyInstaller build succeeded:");
+            log::error!("   pyinstaller voicetype-server.spec --clean");
+            log::error!("2. Check if dist/voicetype-server/ exists");
+            log::error!("3. Check tauri.conf.json resources config");
             return Err(format!("Backend not found at: {:?}", exe_path));
         }
         
@@ -113,7 +153,8 @@ pub fn spawn_sidecar(handle: &AppHandle, port: u16) -> Result<Child, String> {
         
         let mut cmd = Command::new(&exe_path);
         cmd.args(["--port", &port.to_string(), "--tauri"])
-            .current_dir(&backend_dir)
+            .current_dir(&backend_dir)  // ⚠️ 关键: 工作目录设为exe所在目录
+            .env("VOICETYPE_PACKAGED", "1")  // ✅ 环境变量标记
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         
@@ -124,8 +165,11 @@ pub fn spawn_sidecar(handle: &AppHandle, port: u16) -> Result<Child, String> {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
         
+        log::info!("Spawning backend process...");
         let mut child = cmd.spawn()
             .map_err(|e| format!("Failed to spawn backend: {}", e))?;
+        
+        log::info!("Backend spawned with PID: {}", child.id());
         
         // Stream stdout to logs
         if let Some(stdout) = child.stdout.take() {
@@ -153,6 +197,7 @@ pub fn spawn_sidecar(handle: &AppHandle, port: u16) -> Result<Child, String> {
             });
         }
         
+        log::info!("Backend startup complete");
         return Ok(child);
     }
 }

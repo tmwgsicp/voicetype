@@ -1,14 +1,18 @@
 [package]
 name = "voicetype"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "VoiceType - AI Voice Input Desktop App"
+description = "VoiceType - AI 语音输入工具，本地识别，隐私保护"
+authors = ["tmwgsicp <https://github.com/tmwgsicp>"]
 license = "AGPL-3.0"
+repository = "https://github.com/tmwgsicp/voicetype"
+homepage = "https://github.com/tmwgsicp/voicetype"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-process = "2"
+tauri-plugin-keyring = { path = "..\\vendor\\tauri-plugin-keyring" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json"] }

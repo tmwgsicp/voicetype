@@ -67,7 +67,22 @@ export function useWebSocket() {
     }
   }
 
+  function connect() {
+    startListening()
+  }
+
+  function on(event: string, callback: (data: any) => void) {
+    // 简化版事件监听器,仅用于兼容性
+    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+      listen<any>('backend-event', (ev) => {
+        if (ev.payload.type === event) {
+          callback(ev.payload)
+        }
+      })
+    }
+  }
+
   onUnmounted(stopListening)
 
-  return { state, startListening, stopListening }
+  return { state, startListening, stopListening, connect, on }
 }

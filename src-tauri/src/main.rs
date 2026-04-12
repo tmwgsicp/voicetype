@@ -67,6 +67,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_keyring::init())
         .manage(AppState {
             port: Mutex::new(port),
             sidecar_child: Mutex::new(None),

@@ -6,9 +6,18 @@
   <div
     class="floating-container"
     @mousedown.left="onMouseDown"
-    @contextmenu.prevent="onRightClick"
+    @contextmenu.prevent
+    @mouseenter="showTooltip = true"
+    @mouseleave="showTooltip = false"
   >
     <canvas ref="canvasRef" :width="canvasW" :height="canvasH"></canvas>
+    
+    <!-- 工具提示 -->
+    <div v-if="showTooltip" class="tooltip" :class="tooltipClass">
+      <div class="tooltip-title">{{ tooltipTitle }}</div>
+      <div class="tooltip-hint">{{ tooltipHint }}</div>
+    </div>
+    
     <div v-if="showMenu" class="context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
       <div class="menu-status">{{ stateLabel }}</div>
       <div class="menu-sep"></div>
@@ -76,6 +85,27 @@ const stateLabel = computed(() => {
 const showMenu = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
+
+const showTooltip = ref(false)
+const tooltipClass = computed(() => state.value)
+const tooltipTitle = computed(() => {
+  if (state.value === 'loading') {
+    return isAsrConnected.value ? '准备就绪' : '正在初始化...'
+  }
+  if (state.value === 'recording') {
+    return '正在录音'
+  }
+  return '待机中'
+})
+const tooltipHint = computed(() => {
+  if (state.value === 'loading') {
+    return isAsrConnected.value ? '点击开始录音' : '请稍候,正在加载 ASR 模型'
+  }
+  if (state.value === 'recording') {
+    return '再次点击或按 F9 停止'
+  }
+  return '点击开始录音 或 按 F9'
+})
 
 let animId = 0
 let tick = 0
@@ -281,4 +311,66 @@ canvas { display: block; }
   transition: background 150ms;
 }
 .menu-item:hover { background: #3a3a3a; }
+
+/* 工具提示 */
+.tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: rgba(38, 38, 38, 0.95);
+  border-radius: 8px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: tooltipFadeIn 0.2s ease-out;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-8px);
+  }
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(38, 38, 38, 0.95);
+}
+
+.tooltip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.tooltip-hint {
+  font-size: 11px;
+  color: #bfbfbf;
+}
+
+.tooltip.recording .tooltip-title {
+  color: #ff4d4f;
+}
+
+.tooltip.loading .tooltip-title {
+  color: #1890ff;
+}
+
+.tooltip.standby .tooltip-title {
+  color: #13c2c2;
+}
+
 </style>
