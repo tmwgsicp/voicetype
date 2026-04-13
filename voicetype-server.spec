@@ -16,8 +16,10 @@ elif sys.platform.startswith('linux'):
 
 # ========== PyInstaller 配置 ==========
 
+import os
+
 a = Analysis(
-    ['voicetype\\__main__.py'],
+    [os.path.join('voicetype', '__main__.py')],
     pathex=[],
     binaries=[],
     datas=[
