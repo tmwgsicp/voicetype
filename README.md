@@ -199,7 +199,7 @@ ASR_MODEL=qwen3-asr-flash-realtime  # 阿里云推荐模型
 3. **数据存储**: 声纹特征存储在 `~/.config/voicetype/voiceprints/`,不上传云端
 
 **技术特点**:
-- 基于 ONNX Runtime 的轻量级声纹模型(25MB)
+- 基于 Sherpa-ONNX 的 3D-Speaker 声纹模型(25MB)
 - 余弦相似度评分(0-1),默认阈值 0.4(建议 0.3-0.5)
 - 低阈值(如 0.3):识别更宽松,适合嘈杂环境
 - 高阈值(如 0.5):识别更严格,适合安静环境
@@ -410,7 +410,7 @@ voicetype/
 | **后端** | FastAPI + Uvicorn |
 | **本地 ASR** | Sherpa-ONNX (C++ 推理引擎 + ONNX Runtime) |
 | **云端 ASR** | 阿里云 DashScope / 腾讯云 / 讯飞 |
-| **声纹识别** | ONNX Runtime + 自定义声纹模型 |
+| **声纹识别** | Sherpa-ONNX (3D-Speaker 声纹模型) |
 | **LLM** | OpenAI API 兼容接口(支持阿里云/OpenAI/DeepSeek/GLM) |
 | **音频采集** | sounddevice (跨平台 PortAudio) |
 | **键盘输出** | pynput (剪贴板 + 模拟粘贴) |
