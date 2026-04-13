@@ -18,36 +18,74 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
       
-      - name: Install dependencies
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Python dependencies
         run: |
-          npm ci
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Install Node dependencies (root)
+        run: npm ci
+      
+      - name: Install Node dependencies (frontend)
+        run: |
           cd src-ui
           npm ci
       
       - name: Download AI models
-        run: |
-          npm run download-models
+        run: npm run download-models
       
-      - name: Build Tauri (NSIS)
+      - name: Package Python backend with PyInstaller
+        run: pyinstaller voicetype-server.spec
+      
+      - name: Verify Python package
         run: |
-          npm run tauri build
+          if (!(Test-Path "dist/voicetype-server/voicetype-server.exe")) {
+            Write-Error "PyInstaller output not found!"
+            exit 1
+          }
+          Write-Output "PyInstaller package created successfully"
+      
+      - name: Build Tauri application
+        run: npm run build
+      
+      - name: Verify build output
+        run: |
+          if (!(Test-Path "src-tauri/target/release/bundle/nsis/*.exe")) {
+            Write-Error "NSIS installer not found!"
+            exit 1
+          }
+          Get-Item "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
       
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
         with:
           name: VoiceType-Windows-x64
           path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
       
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            src-tauri/target/release/bundle/nsis/*.exe
+          files: src-tauri/target/release/bundle/nsis/*.exe
           draft: false
           prerelease: false
         env:
@@ -64,36 +102,74 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       
-      - name: Install dependencies
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Python dependencies
         run: |
-          npm ci
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Install Node dependencies (root)
+        run: npm ci
+      
+      - name: Install Node dependencies (frontend)
+        run: |
           cd src-ui
           npm ci
       
       - name: Download AI models
-        run: |
-          npm run download-models
+        run: npm run download-models
       
-      - name: Build Tauri (DMG)
+      - name: Package Python backend with PyInstaller
+        run: pyinstaller voicetype-server.spec
+      
+      - name: Verify Python package
         run: |
-          npm run tauri build
+          if [ ! -f "dist/voicetype-server/voicetype-server" ]; then
+            echo "PyInstaller output not found!"
+            exit 1
+          fi
+          echo "PyInstaller package created successfully"
+      
+      - name: Build Tauri application
+        run: npm run build
+      
+      - name: Verify build output
+        run: |
+          if ! ls src-tauri/target/release/bundle/dmg/*.dmg 1> /dev/null 2>&1; then
+            echo "DMG installer not found!"
+            exit 1
+          fi
+          ls -lh src-tauri/target/release/bundle/dmg/*.dmg
       
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: VoiceType-macOS
           path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
       
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            src-tauri/target/release/bundle/dmg/*.dmg
+          files: src-tauri/target/release/bundle/dmg/*.dmg
           draft: false
           prerelease: false
         env:
