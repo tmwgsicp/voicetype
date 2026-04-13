@@ -391,12 +391,8 @@ voicetype/
 │   │   └── sidecar.rs          # Python 后端进程管理
 │   └── tauri.conf.json
 ├── scripts/                    # 工具脚本
-│   ├── download_models.py      # 统一模型下载脚本
-│   └── check_model_info.py     # 模型信息查看
+│   └── download_models.py      # 统一模型下载脚本
 ├── models/                     # AI 模型存储目录
-├── docs/                       # 文档
-│   ├── BUILD_GUIDE.md          # 打包指南
-│   └── CONFIG_PRIORITY.md      # 配置优先级说明
 ├── .env.example                # 环境变量示例
 ├── requirements.txt            # Python 依赖
 ├── pyproject.toml              # Python 项目配置
