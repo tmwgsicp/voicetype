@@ -410,7 +410,7 @@ voicetype/
 | **后端** | FastAPI + Uvicorn |
 | **本地 ASR** | Sherpa-ONNX (C++ 推理引擎 + ONNX Runtime) |
 | **云端 ASR** | 阿里云 DashScope / 腾讯云 / 讯飞 |
-| **声纹识别** | Sherpa-ONNX (3D-Speaker 声纹模型) |
+| **声纹识别** | Sherpa-ONNX + 3D-Speaker 模型(阿里达摩院) |
 | **LLM** | OpenAI API 兼容接口(支持阿里云/OpenAI/DeepSeek/GLM) |
 | **音频采集** | sounddevice (跨平台 PortAudio) |
 | **键盘输出** | pynput (剪贴板 + 模拟粘贴) |
