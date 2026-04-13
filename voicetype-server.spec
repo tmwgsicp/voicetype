@@ -24,6 +24,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('voicetype', 'voicetype'),
+        ('models', 'models'),
     ],
     hiddenimports=[
         'voicetype',
