@@ -138,7 +138,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: macos-13  # Intel x86_64
+          - runner: macos-12  # Intel x86_64 (最后一个稳定的 Intel runner)
             arch: x86_64
             target: x86_64-apple-darwin
           - runner: macos-14  # Apple Silicon aarch64
