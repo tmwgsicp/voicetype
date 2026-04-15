@@ -95,7 +95,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - runner: macos-13  # Intel x86_64
+            arch: x86_64
+            target: x86_64-apple-darwin
+          - runner: macos-14  # Apple Silicon aarch64
+            arch: aarch64
+            target: aarch64-apple-darwin
+    
+    runs-on: ${{ matrix.runner }}
     
     steps:
       - name: Checkout code
@@ -110,12 +120,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.target }}
       
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          key: ${{ matrix.arch }}
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -139,6 +150,16 @@ jobs:
       - name: Download AI models
         run: npm run download-models
       
+      - name: Verify models downloaded
+        run: |
+          echo "Checking models directory..."
+          if [ ! -f "models/speaker_recognition.onnx" ]; then
+            echo "Voiceprint model not found!"
+            exit 1
+          fi
+          echo "✓ Voiceprint model found"
+          du -sh models/
+      
       - name: Package Python backend with PyInstaller
         run: pyinstaller voicetype-server.spec
       
@@ -148,7 +169,13 @@ jobs:
             echo "PyInstaller output not found!"
             exit 1
           fi
-          echo "PyInstaller package created successfully"
+          if [ ! -d "dist/voicetype-server/models" ]; then
+            echo "Models not included in package!"
+            exit 1
+          fi
+          echo "✓ PyInstaller package created successfully"
+          du -sh dist/voicetype-server/
+          du -sh dist/voicetype-server/models/
       
       - name: Build Tauri application
         run: npm run build
@@ -164,7 +191,7 @@ jobs:
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VoiceType-macOS
+          name: VoiceType-macOS-${{ matrix.arch }}
           path: src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
       
