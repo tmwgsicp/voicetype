@@ -78,6 +78,16 @@ jobs:
       - name: Package Python backend with PyInstaller
         run: pyinstaller voicetype-server.spec
       
+      - name: Ensure models are included (fallback)
+        run: |
+          if (!(Test-Path "dist\voicetype-server\models")) {
+            Write-Output "Models not found in package, copying manually..."
+            Copy-Item -Path "models" -Destination "dist\voicetype-server\" -Recurse -Force
+            Write-Output "✓ Models copied manually"
+          } else {
+            Write-Output "✓ Models already included by PyInstaller"
+          }
+      
       - name: Verify Python package
         run: |
           if (!(Test-Path "dist\voicetype-server\voicetype-server.exe")) {
@@ -192,6 +202,16 @@ jobs:
       
       - name: Package Python backend with PyInstaller
         run: pyinstaller voicetype-server.spec
+      
+      - name: Ensure models are included (fallback)
+        run: |
+          if [ ! -d "dist/voicetype-server/models" ]; then
+            echo "Models not found in package, copying manually..."
+            cp -r models dist/voicetype-server/
+            echo "✓ Models copied manually"
+          else
+            echo "✓ Models already included by PyInstaller"
+          fi
       
       - name: Verify Python package
         run: |
