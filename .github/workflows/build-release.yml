@@ -55,16 +55,46 @@ jobs:
       - name: Download AI models
         run: npm run download-models
       
+      - name: Verify models downloaded
+        run: |
+          Write-Output "Checking models directory..."
+          if (!(Test-Path "models\speaker_recognition.onnx")) {
+            Write-Error "Voiceprint model not found!"
+            exit 1
+          }
+          if (!(Test-Path "models\sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20")) {
+            Write-Error "ASR model not found!"
+            exit 1
+          }
+          if (!(Test-Path "models\sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01")) {
+            Write-Error "KWS model not found!"
+            exit 1
+          }
+          Write-Output "✓ All models found"
+          Get-ChildItem models -Recurse -File | Measure-Object -Property Length -Sum | ForEach-Object {
+            Write-Output "Total models size: $([math]::Round($_.Sum/1MB,2)) MB"
+          }
+      
       - name: Package Python backend with PyInstaller
         run: pyinstaller voicetype-server.spec
       
       - name: Verify Python package
         run: |
-          if (!(Test-Path "dist/voicetype-server/voicetype-server.exe")) {
+          if (!(Test-Path "dist\voicetype-server\voicetype-server.exe")) {
             Write-Error "PyInstaller output not found!"
             exit 1
           }
-          Write-Output "PyInstaller package created successfully"
+          if (!(Test-Path "dist\voicetype-server\models")) {
+            Write-Error "Models not included in package!"
+            exit 1
+          }
+          Write-Output "✓ PyInstaller package created successfully"
+          Get-ChildItem "dist\voicetype-server" -Recurse -File | Measure-Object -Property Length -Sum | ForEach-Object {
+            Write-Output "Package size: $([math]::Round($_.Sum/1MB,2)) MB"
+          }
+          Get-ChildItem "dist\voicetype-server\models" -Recurse -File | Measure-Object -Property Length -Sum | ForEach-Object {
+            Write-Output "Models size: $([math]::Round($_.Sum/1MB,2)) MB"
+          }
       
       - name: Build Tauri application
         run: npm run build

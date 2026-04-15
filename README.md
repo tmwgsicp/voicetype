@@ -199,7 +199,7 @@ ASR_MODEL=qwen3-asr-flash-realtime  # 阿里云推荐模型
 3. **数据存储**: 声纹特征存储在 `~/.config/voicetype/voiceprints/`,不上传云端
 
 **技术特点**:
-- 基于 Sherpa-ONNX 的 3D-Speaker 声纹模型(25MB)
+- 基于 Sherpa-ONNX + 3D-Speaker 模型(阿里达摩院开源，25MB)
 - 余弦相似度评分(0-1),默认阈值 0.4(建议 0.3-0.5)
 - 低阈值(如 0.3):识别更宽松,适合嘈杂环境
 - 高阈值(如 0.5):识别更严格,适合安静环境

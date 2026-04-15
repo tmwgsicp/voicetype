@@ -68,8 +68,7 @@
     "copyright": "Copyright © 2026 tmwgsicp. Licensed under AGPL-3.0.",
     "licenseFile": "../LICENSE",
     "macOS": {
-      "minimumSystemVersion": "10.13",
-      "architectures": ["x86_64", "aarch64"]
+      "minimumSystemVersion": "10.13"
     },
     "windows": {
       "nsis": {}
