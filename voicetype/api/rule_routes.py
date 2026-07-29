@@ -24,11 +24,25 @@ rule_router = APIRouter(prefix="/api/rules", tags=["rules"])
 
 RULES_FILE = get_config_dir() / "rules.json"
 _rule_replacer: Optional[RuleReplacer] = None
+_engine = None
+
+
+def set_rule_engine(engine):
+    """让规则 API 与引擎 pipeline 共用同一个 RuleReplacer。"""
+    global _engine
+    _engine = engine
 
 
 def get_rule_replacer() -> RuleReplacer:
-    """Get or create global RuleReplacer instance."""
+    """
+    返回全局唯一的 RuleReplacer。优先用引擎 pipeline 里的那个实例，
+    这样 UI 增删改的术语规则会实时进入识别管线，无需重启（单一真源）。
+    """
     global _rule_replacer
+    if _engine is not None and getattr(_engine, "pipeline", None) is not None:
+        pr = getattr(_engine.pipeline, "_rule_replacer", None)
+        if pr is not None:
+            return pr
     if _rule_replacer is None:
         _rule_replacer = RuleReplacer(rules_file=RULES_FILE)
     return _rule_replacer

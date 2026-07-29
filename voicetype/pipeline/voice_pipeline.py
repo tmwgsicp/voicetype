@@ -133,9 +133,12 @@ class VoiceTypingPipeline:
         if self._on_raw_text:
             await self._on_raw_text(raw_text)
 
-        # Apply rule replacement BEFORE LLM processing
-        text_after_rules = self._rule_replacer.apply(raw_text, add_lock_tags=True)
-        
+        # 顺序很关键：先对「原始文本」做安全过滤（它会剥离用户输入里的 <lock> 标签，防注入），
+        # 再套用术语规则加上锁定标签，最后带着锁定标签发给 LLM。
+        # 若顺序反过来，pre_filter 会把规则刚加的锁定标签删掉，导致术语锁定完全失效。
+        safety = pre_filter(raw_text)
+        text_after_rules = self._rule_replacer.apply(safety.text, add_lock_tags=True)
+
         # 如果 LLM 未启用，直接输出规则替换后的文本
         if not self._llm_enabled:
             # 移除锁定标签（用户不应该看到）
@@ -144,8 +147,6 @@ class VoiceTypingPipeline:
             if self._on_final_text:
                 await self._on_final_text(final_text)
             return
-        
-        safety = pre_filter(text_after_rules)
 
         system_prompt = build_system_prompt(
             scene=self._current_scene,
@@ -155,7 +156,8 @@ class VoiceTypingPipeline:
         try:
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend(self._build_context_messages())
-            messages.append({"role": "user", "content": safety.text})
+            # 带锁定标签发给 LLM（系统提示词要求 100% 保留 <lock> 内容）
+            messages.append({"role": "user", "content": text_after_rules})
 
             stream = await self._client.chat.completions.create(
                 model=self._model,
@@ -200,6 +202,37 @@ class VoiceTypingPipeline:
             final_text = remove_lock_tags(text_after_rules)
             if self._on_final_text:
                 await self._on_final_text(final_text)
+
+    async def apply_text_action(self, selection: str, system_prompt: str) -> str:
+        """
+        预设文本动作：用固定的 system_prompt 改写选中的原文，返回改写后的最终文本。
+        selection = 用户选中的原文；system_prompt = 某个预设动作的固定 prompt（见 text_actions.py）。
+        失败或未配 LLM 时原样返回选区，绝不吞掉用户文字。
+        """
+        selection = (selection or "").strip()
+        if not selection:
+            return selection
+        if not self._llm_enabled or not self._client:
+            # 没配 LLM 无法改写，原样返回
+            logger.warning("apply_text_action: LLM not configured, returning selection unchanged")
+            return selection
+        try:
+            resp = await self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": selection},
+                ],
+                temperature=0.3,
+                max_tokens=max(self._max_tokens, len(selection) + 256),
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            )
+            out = (resp.choices[0].message.content or "").strip()
+            logger.info("Text action: '%s' -> '%s'", selection[:40], out[:60])
+            return out or selection
+        except Exception as e:
+            logger.error("Text action failed: %s", e)
+            return selection
 
     async def close(self):
         if self._client:

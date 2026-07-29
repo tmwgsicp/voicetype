@@ -48,6 +48,7 @@ def _task_done_callback(task: asyncio.Task):
 from .platform.microphone import Microphone
 from .platform.window_watcher import WindowWatcher, WindowInfo
 from .context.scene_classifier import SceneClassifier, Scene, SCENES
+from .platform.scene_manager import SceneManager
 from .pipeline.voice_pipeline import VoiceTypingPipeline
 from .platform.keyboard_output import KeyboardOutput
 from .platform.hotkey_listener import HotkeyListener
@@ -71,12 +72,14 @@ class VoiceTypingEngine:
         asr_max_silence_ms: int = 1200,
         asr_vad_threshold: float = 0.5,
         voiceprint_threshold: float = 0.5,
-        sherpa_model_dir: str = "models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23",
+        sherpa_model_dir: str = "models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
         sherpa_kws_enabled: bool = False,
         sherpa_kws_model_dir: str = "models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01",
         sherpa_keywords: list[str] = None,
         hotkey: str = "<ctrl>+<shift>+v",
         typing_delay_ms: int = 5,
+        auto_scene_enabled: bool = True,
+        edit_hotkey: str = "<f10>",
     ):
         """
         Initialize VoiceTypingEngine.
@@ -148,6 +151,7 @@ class VoiceTypingEngine:
         self._voiceprint_checking_in_progress = False  # 是否正在验证中（防止重复验证）
         self._speech_frame_count = 0  # 连续语音帧计数
         self._silence_frame_count = 0  # 连续静音帧计数
+        self._last_level_ts = 0.0  # 上次广播音量的时间戳（用于节流悬浮窗波形）
 
         self.pipeline = VoiceTypingPipeline(
             llm_api_key=llm_api_key,
@@ -156,7 +160,11 @@ class VoiceTypingEngine:
         )
 
         self.window_watcher = WindowWatcher(poll_interval_ms=200)
-        self.scene_classifier = SceneClassifier()
+        self.scene_classifier = SceneClassifier()  # 保留兼容，自动检测实际用 scene_manager
+        # 场景的唯一真源：用户在 UI「场景管理」里配置的场景 + 应用绑定，
+        # 引擎自动检测和 API 都用这同一个实例。
+        self.scene_manager = SceneManager(scenes_file=get_config_dir() / "scenes.json")
+        self._auto_scene_enabled = auto_scene_enabled
 
         self.keyboard_output = KeyboardOutput(typing_delay_ms=typing_delay_ms)
         self.hotkey_listener = HotkeyListener(
@@ -165,12 +173,29 @@ class VoiceTypingEngine:
             on_deactivate=self.stop_recording,
             is_active_fn=lambda: self._is_recording,
         )
+        # 文本编辑快捷键（选中文字后按它，弹预设动作菜单，选一个就地改写）
+        self._edit_hotkey = edit_hotkey
+        self._edit_selection = ""       # 当前待改写的选区原文
+        self._edit_target_hwnd = 0      # 弹菜单前的目标程序窗口，套用时切回去
+        self._edit_menu_open = False    # 菜单是否正显示
+        self._edit_key_listener = None  # 菜单打开期间的全局按键捕获（1-5/Esc）
+        self._edit_key_map = {}         # 数字键 -> action_id
+        self._edit_cancel_timer = None  # 安全兜底：超时自动取消
+        self._loop = None               # 事件循环引用（供 pynput 线程回调）
+        # 每次按下都触发 _start_edit（单次触发，非 toggle）：is_active_fn 恒 False
+        self.edit_hotkey_listener = HotkeyListener(
+            hotkey=edit_hotkey,
+            on_activate=self._start_edit,
+            on_deactivate=None,
+            is_active_fn=lambda: False,
+        )
 
         self._is_recording = False
         self._recording_lock = asyncio.Lock()
         self._last_toggle_time = 0.0
         self._toggle_cooldown = 0.3
         self._scene_override: Optional[str] = None
+        self._last_auto_scene: Optional[str] = None  # 上次自动识别的场景名，用于去重日志/广播
         self._ws_clients: list[WebSocket] = []
         self._asr_connected = False  # 新增：ASR连接状态
 
@@ -196,6 +221,37 @@ class VoiceTypingEngine:
         if self._voiceprint_service:
             logger.info(f"   - Threshold: {getattr(self._voiceprint_service, 'threshold', 'N/A')}")
 
+    async def reload_hotkey(self, hotkey: str):
+        """热重载全局快捷键：停掉旧监听器，用新快捷键重启（无需重启应用）。"""
+        try:
+            await self.hotkey_listener.stop()
+        except Exception as e:
+            logger.warning("Stop old hotkey listener failed: %s", e)
+        self.hotkey_listener = HotkeyListener(
+            hotkey=hotkey,
+            on_activate=self.start_recording,
+            on_deactivate=self.stop_recording,
+            is_active_fn=lambda: self._is_recording,
+        )
+        await self.hotkey_listener.start()
+        logger.info("Hotkey reloaded: %s", hotkey)
+
+    async def reload_edit_hotkey(self, edit_hotkey: str):
+        """热重载文本编辑快捷键。"""
+        try:
+            await self.edit_hotkey_listener.stop()
+        except Exception as e:
+            logger.warning("Stop old edit hotkey listener failed: %s", e)
+        self._edit_hotkey = edit_hotkey
+        self.edit_hotkey_listener = HotkeyListener(
+            hotkey=edit_hotkey,
+            on_activate=self._start_edit,
+            on_deactivate=None,
+            is_active_fn=lambda: False,
+        )
+        await self.edit_hotkey_listener.start()
+        logger.info("Edit hotkey reloaded: %s", edit_hotkey)
+
     def set_scene_override(self, scene_name: Optional[str]):
         if scene_name and scene_name in SCENES:
             self._scene_override = scene_name
@@ -215,14 +271,12 @@ class VoiceTypingEngine:
             from .voiceforge.extensions.providers.sherpa.kws_sherpa import SherpaKWSExtension
             from .voiceforge.core.config import ExtensionConfig
             
-            # 写入关键词文件
-            import os
-            keywords_file = os.path.join(self._sherpa_kws_model_dir, "keywords.txt")
-            os.makedirs(self._sherpa_kws_model_dir, exist_ok=True)
+            # 写入关键词文件到「可写的」配置目录（打包后安装目录是只读的，不能写模型目录）
+            keywords_file = str(get_config_dir() / "kws_keywords.txt")
             with open(keywords_file, "w", encoding="utf-8") as f:
                 for kw in self._sherpa_keywords:
                     f.write(f"{kw}\n")
-            
+
             logger.info(f"KWS keywords written to {keywords_file}: {self._sherpa_keywords}")
             
             # 定义关键词检测回调
@@ -251,9 +305,11 @@ class VoiceTypingEngine:
 
     async def start(self):
         """Initialize all components."""
+        self._loop = asyncio.get_running_loop()  # 供 pynput 线程回调调度协程
         await self.keyboard_output.start()
         await self.window_watcher.start()
         await self.hotkey_listener.start()
+        await self.edit_hotkey_listener.start()
         
         # 启动KWS（如果启用）
         if self._kws_ext:
@@ -266,7 +322,21 @@ class VoiceTypingEngine:
                 logger.info("KWS started, listening for wake words...")
             except Exception as e:
                 logger.error(f"Failed to start KWS: {e}")
-        
+
+        # 后台预热 Sherpa 本地模型（常驻），让首次按 F9 也能秒开、避免等待
+        if self._asr_provider == "sherpa":
+            async def _prewarm_sherpa():
+                try:
+                    from .voiceforge.extensions.providers.sherpa.asr_sherpa import SherpaASRExtension
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None, SherpaASRExtension.prewarm, self._sherpa_model_dir
+                    )
+                    logger.info("Sherpa-ONNX model pre-warmed, recordings will start instantly")
+                except Exception as e:
+                    logger.warning(f"Sherpa prewarm skipped: {e}")
+            asyncio.create_task(_prewarm_sherpa())
+
         logger.info("VoiceTypingEngine started")
 
     async def stop(self):
@@ -274,6 +344,7 @@ class VoiceTypingEngine:
         if self._is_recording:
             await self.stop_recording()
         await self.hotkey_listener.stop()
+        await self.edit_hotkey_listener.stop()
         await self.window_watcher.stop()
         await self.keyboard_output.stop()
         await self.pipeline.close()
@@ -404,25 +475,30 @@ class VoiceTypingEngine:
         """
         try:
             logger.info(f"Reloading LLM config: model={llm_model}, base_url={llm_base_url}")
-            
+
+            # 保存当前场景与自定义提示词，重建 Pipeline 后原样恢复
+            # （否则改 LLM 配置会把手动选的/自动检测的场景+提示词丢掉，退回默认）
+            prev_scene = getattr(self.pipeline, "_current_scene", None)
+            prev_prompt = getattr(self.pipeline, "_custom_prompt", None)
+
             # 重新创建 Pipeline（包含新的 LLM 配置）
             self.pipeline = VoiceTypingPipeline(
                 llm_api_key=llm_api_key,
                 llm_base_url=llm_base_url,
                 llm_model=llm_model,
             )
-            
+
             # 重新绑定回调
             self.pipeline.on_raw_text(self._on_raw_text)
             self.pipeline.on_final_text_stream(self._on_final_text_stream)
             self.pipeline.on_final_text(self._on_final_complete)
-            
-            # 恢复当前场景
-            if self._scene_override:
-                scene_name = self._scene_override
-                if scene_name in SCENES:
-                    self.pipeline.set_scene(SCENES[scene_name])
-            
+
+            # 恢复场景 + 自定义提示词（含用户自定义场景，不只是内置场景）
+            if prev_scene is not None:
+                self.pipeline.set_scene(prev_scene)
+            if prev_prompt is not None:
+                self.pipeline.set_custom_prompt(prev_prompt)
+
             logger.info("LLM config reloaded successfully")
             return True
             
@@ -596,7 +672,7 @@ class VoiceTypingEngine:
                 await self._cleanup_recording()
             except FileNotFoundError as e:
                 logger.error(f"❌ 模型文件未找到: {e}")
-                logger.error("   请运行: python scripts/download_models.py")
+                logger.error("   模型文件缺失，请重新安装 VoiceType（安装包已内置模型）")
                 self._is_recording = False
                 await self._broadcast({
                     "type": "error",
@@ -636,7 +712,7 @@ class VoiceTypingEngine:
             
             # 后台清理资源（不阻塞 UI）
             asyncio.create_task(self._cleanup_recording())
-            
+
             logger.info("Recording stopped")
 
     async def _cleanup_recording(self):
@@ -714,7 +790,16 @@ class VoiceTypingEngine:
         
         if not self._asr_ext.lifecycle.is_ready():
             return
-        
+
+        # 广播实时音量给悬浮窗做波形（节流到 ~12/s，避免刷屏）
+        now_ts = time.time()
+        if now_ts - self._last_level_ts >= 0.08:
+            self._last_level_ts = now_ts
+            energy = self._calculate_audio_energy(pcm_data)
+            # RMS 一般较小，放大并裁剪到 0..1，让波形更明显
+            level = max(0.0, min(1.0, energy * 8.0))
+            await self._broadcast({"type": "audio_level", "level": round(level, 3)})
+
         # === 云端 ASR：音频转发 + 声纹后验证 ===
         if self._asr_provider in ["aliyun", "tencent"]:
             # ✅ 云端ASR：始终发送音频（无法预先判断说话段落）
@@ -922,16 +1007,170 @@ class VoiceTypingEngine:
         except Exception as e:
             logger.error("Sentence processing failed: %s", e)
 
-    async def _on_window_change(self, window: WindowInfo):
-        if self._scene_override:
+    async def _start_edit(self):
+        """文本编辑入口：捕获选中的文字 + 目标窗口 + 光标位置，广播事件让前端在光标处弹预设动作菜单。
+
+        全程不录音、不走意图识别——用户从菜单选一个固定动作（翻译/润色/精简/正式/要点）即可，
+        快且可预测。无选中则提示。"""
+        if self._is_recording:
+            # 正在听写时不打扰，避免冲突
             return
-        scene = self.scene_classifier.classify(window)
-        self.pipeline.set_scene(scene)
-        logger.info("Auto scene: %s (window: %s)", scene.name, window.app_name)
+        # 先记住目标程序窗口（菜单窗抢焦点后好切回来），再抓选区
+        hwnd = await self.keyboard_output.get_foreground_window()
+        selection = await self.keyboard_output.get_selection()
+        if not selection or not selection.strip():
+            await self._broadcast({"type": "error", "message": "请先选中要处理的文字，再按编辑快捷键"})
+            logger.info("Edit menu: no text selected")
+            return
+        self._edit_selection = selection
+        self._edit_target_hwnd = hwnd
+        self._edit_menu_open = True
+        pos = await self.keyboard_output.get_cursor_pos()
+        from .pipeline.text_actions import actions_for_menu
+        menu = actions_for_menu()
+        # 数字键 -> action_id（菜单窗是非激活窗口，键盘由后端全局捕获）
+        self._edit_key_map = {a["key"]: a["id"] for a in menu}
+        logger.info("Edit menu: selection %d chars, hwnd=%s, cursor=%s", len(selection), hwnd, pos)
+        await self._broadcast({
+            "type": "edit_menu_show",
+            "x": pos[0],
+            "y": pos[1],
+            "preview": selection[:80],
+            "actions": menu,
+        })
+        self._start_menu_key_capture()
+
+    async def apply_edit_action(self, action_id: str):
+        """用户在菜单里选了某个预设动作：LLM 按该动作固定 prompt 改写选区，切回目标程序并替换。"""
+        from .pipeline.text_actions import action_prompt, get_action
+        self._stop_menu_key_capture()   # 先解除键盘捕获，LLM 处理期间不影响用户打字
+        selection = self._edit_selection
+        hwnd = self._edit_target_hwnd
+        # 立即收起菜单并清状态（避免重复触发）
+        self._edit_selection = ""
+        self._edit_target_hwnd = 0
+        self._edit_menu_open = False
+        await self._broadcast({"type": "edit_menu_hide"})
+
+        if not selection:
+            logger.info("Edit apply: no pending selection")
+            return
+        prompt = action_prompt(action_id)
+        if not prompt:
+            logger.warning("Edit apply: unknown action '%s'", action_id)
+            return
+        action = get_action(action_id)
+        try:
+            result = await self.pipeline.apply_text_action(selection, prompt)
+            if not result or not result.strip():
+                logger.info("Edit apply: empty result, skip")
+                return
+            # 切回目标程序（菜单窗抢走了焦点），选区仍高亮，粘贴即替换
+            if hwnd:
+                focused = await self.keyboard_output.focus_window(hwnd)
+                if not focused:
+                    logger.warning("Edit apply: failed to refocus target window %s", hwnd)
+                await asyncio.sleep(0.06)
+            await self.keyboard_output.type_text(result)
+            await self._broadcast({"type": "final_complete", "text": result})
+            logger.info("Edit apply: action=%s, %d->%d chars", action_id, len(selection), len(result))
+            try:
+                from . import stats
+                stats.record_dictation(result, scene="edit", app=(action["label"] if action else None))
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error("Edit apply failed: %s", e)
+
+    async def cancel_edit(self):
+        """用户取消（按 Esc / 点空白）：收起菜单，丢弃选区状态。"""
+        self._stop_menu_key_capture()
+        self._edit_selection = ""
+        self._edit_target_hwnd = 0
+        self._edit_menu_open = False
+        await self._broadcast({"type": "edit_menu_hide"})
+        logger.info("Edit menu: cancelled")
+
+    def _start_menu_key_capture(self):
+        """菜单打开期间，全局捕获 1-5 / Esc（因为菜单窗不抢焦点，按键会落到目标程序）。
+
+        suppress=True 会在菜单显示的短暂期间拦截所有按键——这是刻意的（modal 菜单），
+        选中/取消/超时后立即解除。鼠标点击不受影响，走 API 分支。
+        """
+        self._stop_menu_key_capture()
+        try:
+            from pynput import keyboard as kb
+        except Exception as e:
+            logger.warning("pynput unavailable for menu key capture: %s", e)
+            return
+
+        def on_press(key):
+            try:
+                if key == kb.Key.esc:
+                    self._dispatch(self.cancel_edit())
+                    return
+                ch = getattr(key, "char", None)
+                if ch and ch in self._edit_key_map:
+                    action_id = self._edit_key_map[ch]
+                    self._dispatch(self.apply_edit_action(action_id))
+            except Exception as ex:
+                logger.error("menu key handler error: %s", ex)
+
+        try:
+            self._edit_key_listener = kb.Listener(on_press=on_press, suppress=True)
+            self._edit_key_listener.start()
+        except Exception as e:
+            logger.warning("Failed to start menu key capture: %s", e)
+            self._edit_key_listener = None
+
+        # 安全兜底：10s 内没选择就自动取消，避免键盘一直被拦截
+        if self._loop:
+            self._edit_cancel_timer = self._loop.call_later(
+                10.0, lambda: self._dispatch(self.cancel_edit()) if self._edit_menu_open else None
+            )
+
+    def _stop_menu_key_capture(self):
+        """解除菜单期间的键盘捕获 + 取消兜底定时器。"""
+        if self._edit_key_listener is not None:
+            try:
+                self._edit_key_listener.stop()
+            except Exception:
+                pass
+            self._edit_key_listener = None
+        if self._edit_cancel_timer is not None:
+            try:
+                self._edit_cancel_timer.cancel()
+            except Exception:
+                pass
+            self._edit_cancel_timer = None
+
+    def _dispatch(self, coro):
+        """从任意线程把协程调度到事件循环执行。"""
+        if self._loop:
+            self._loop.call_soon_threadsafe(lambda: asyncio.ensure_future(coro))
+        else:
+            logger.warning("No loop to dispatch edit coroutine")
+
+    async def _on_window_change(self, window: WindowInfo):
+        # 手动选了场景、或用户关闭了"自动切换场景"，都不自动切
+        if self._scene_override or not self._auto_scene_enabled:
+            return
+        # 用 scene_manager（用户在 UI 里配置的场景+应用绑定）做自动检测——单一真源。
+        cs = self.scene_manager.detect_scene(window.app_name, window.window_title)
+        scene_id = cs.id if cs else "general"
+        # 场景没变就什么都不做——避免每次窗口标题变化（终端 cwd、浏览器标签等）
+        # 都重置一次场景，那样太"强制"，也会覆盖掉刚清理到一半的上下文。
+        if scene_id == self._last_auto_scene:
+            return
+        self._last_auto_scene = scene_id
+        if cs:
+            self.pipeline.set_scene(cs.to_scene())
+            self.pipeline.set_custom_prompt(cs.prompt)
+        logger.info("Auto scene: %s (window: %s)", scene_id, window.app_name)
         await self._broadcast({
             "type": "scene_change",
-            "scene": scene.name,
-            "display_name": scene.display_name,
+            "scene": scene_id,
+            "display_name": cs.name if cs else "通用",
         })
 
     async def _on_raw_text(self, text: str):
@@ -943,6 +1182,15 @@ class VoiceTypingEngine:
     async def _on_final_complete(self, text: str):
         await self.keyboard_output.type_text(text)
         await self._broadcast({"type": "final_complete", "text": text})
+        # 记录使用统计（在上屏之后，且失败绝不影响听写）
+        try:
+            from . import stats
+            scene = self._last_auto_scene or self._scene_override or "general"
+            cur = getattr(self.window_watcher, "_current", None)
+            app = getattr(cur, "app_name", None) if cur is not None else None
+            stats.record_dictation(text, scene=scene, app=app)
+        except Exception as e:
+            logger.debug("Stat record skipped: %s", e)
 
     def add_ws_client(self, ws: WebSocket):
         self._ws_clients.append(ws)

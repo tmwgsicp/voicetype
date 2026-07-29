@@ -125,6 +125,11 @@ class VoiceTypeConfig(BaseModel):
 
     # Hotkey
     hotkey: str = Field(default="<f9>", description="Toggle hotkey (pynput format)")
+    edit_hotkey: str = Field(
+        default="<f8>",
+        description="文本编辑快捷键：选中文字后按它，弹预设动作菜单就地改写（pynput 格式）。"
+                    "默认 F8（紧挨 F9 听写，好记且各程序基本不占用）；避开 F10（会触发 Word 菜单）"
+    )
 
     # Output
     typing_delay_ms: int = Field(default=5, description="Typing delay between chars (ms)")
@@ -135,6 +140,12 @@ class VoiceTypeConfig(BaseModel):
 
     # Auto-start
     auto_start_asr: bool = Field(default=False, description="Auto-start recording on launch")
+
+    # Scene auto-switching based on active window
+    auto_scene_enabled: bool = Field(
+        default=True,
+        description="根据当前应用自动切换场景（关闭后仅使用手动选择的场景）"
+    )
 
     # Voiceprint
     voiceprint_enabled: bool = Field(default=False, description="Enable voiceprint recognition")
@@ -319,10 +330,12 @@ def load_config() -> VoiceTypeConfig:
         "LLM_TEMPERATURE": "llm_temperature",
         "LLM_MAX_TOKENS": "llm_max_tokens",
         "HOTKEY": "hotkey",
+        "EDIT_HOTKEY": "edit_hotkey",
         "TYPING_DELAY_MS": "typing_delay_ms",
         "HOST": "host",
         "PORT": "port",
         "AUTO_START_ASR": "auto_start_asr",
+        "AUTO_SCENE_ENABLED": "auto_scene_enabled",
         "VOICEPRINT_ENABLED": "voiceprint_enabled",
         "VOICEPRINT_PROVIDER": "voiceprint_provider",
         "VOICEPRINT_THRESHOLD": "voiceprint_threshold",
@@ -355,29 +368,42 @@ def load_config() -> VoiceTypeConfig:
 
 def save_config(config: VoiceTypeConfig):
     """
-    Persist config to config.json.
-    
-    Note: 
-    - 优先使用 OS Keyring 存储 API Keys（Tauri 前端负责）
-    - 如果 Keyring 不可用，API Keys 会保存到 config.json（降级方案）
-    - 开发环境使用 .env 文件
+    Persist config to config.json (single source of truth).
+
+    所有配置（包括 API Keys）都保存在此文件，位于各操作系统的用户配置目录
+    （见 get_config_dir）。后端是持久化的唯一拥有者，前端仅通过 API 读写。
+    开发环境可额外用 .env 文件做覆盖。
     """
     data = config.model_dump()
-    
+
     # 空值不保存（使用默认值）
     if not data.get("llm_base_url"):
         data.pop("llm_base_url", None)
-    
-    # 注意：API Keys 现在会保存到 config.json（降级方案）
-    # 如果 Keyring 可用，前端会自动清理这些字段
 
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     logger.info("Config saved to %s", CONFIG_FILE)
 
 
+def effective_asr_api_key(config: VoiceTypeConfig) -> str:
+    """
+    返回 ASR 实际使用的 API Key。
+
+    阿里云 ASR 和 LLM 都走同一个 DashScope Key，用户通常只填一次。
+    若 ASR 没有单独配置 Key 而 provider 是 aliyun，则回退到 LLM 的 Key。
+    非破坏性：不修改也不持久化 config.asr_api_key，只在消费时解析。
+    """
+    if config.asr_api_key:
+        return config.asr_api_key
+    if config.asr_provider == "aliyun" and config.llm_api_key:
+        return config.llm_api_key
+    return config.asr_api_key
+
+
 def mask_key(key: str) -> str:
-    """Mask API key for display: sk-abc...xyz"""
-    if not key or len(key) < 10:
+    """Mask API key for display: sk-abc...xyz. Empty stays empty."""
+    if not key:
+        return ""
+    if len(key) < 10:
         return "***"
     return key[:6] + "..." + key[-4:]

@@ -1,0 +1,166 @@
+/*
+ * Copyright (C) 2026 VoiceType Contributors
+ * Licensed under AGPL-3.0
+ *
+ * VoiceType 设计系统 —— 基于苹果设计逻辑（内容优先、排版建层级、克制语义色、
+ * 微妙深度、原生控件、8pt 节奏），不是表面复刻。
+ * 令牌集中在此，改一处全局刷新。旧的 --primary-color / --space-* 等名称保留并映射到新值，
+ * 让现有组件平滑过渡。
+ */
+
+:root {
+  /* ---- 字体：SF Pro / 系统字体阶梯 ---- */
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
+
+  /* 字号阶梯（对应 iOS/macOS large-title / title / headline / body / footnote / caption） */
+  --text-large-title: 26px;
+  --text-title: 20px;
+  --text-title3: 17px;
+  --text-headline: 15px;
+  --text-body: 14px;
+  --text-subhead: 13px;
+  --text-footnote: 12px;
+  --text-caption: 11px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ---- 语义色（浅色）：单一强调色 + 中性灰。颜色只用来表意 ---- */
+  --accent: #0a84ff;              /* 系统蓝 */
+  --accent-hover: #0071e3;
+  --accent-tint: rgba(10, 132, 255, 0.12);   /* 选中态/徽标浅底 */
+  --accent-tint-strong: rgba(10, 132, 255, 0.18);
+
+  --red: #ff3b30;
+  --green: #34c759;
+  --orange: #ff9500;
+
+  /* 文字灰度（label 层级） */
+  --label: #1d1d1f;
+  --label-secondary: #6e6e73;
+  --label-tertiary: #8e8e93;
+  --label-quaternary: #b0b0b5;
+
+  /* 背景分层：窗口 < 内容/卡片。营造微妙深度 */
+  --bg-window: #ececef;          /* 窗口底（略深，衬托卡片） */
+  --bg-sidebar: rgba(245, 245, 247, 0.72);   /* 侧栏材质（半透明） */
+  --bg-content: #f5f5f7;         /* 内容区 */
+  --bg-card: #ffffff;            /* 卡片/分组 */
+  --bg-fill: rgba(120, 120, 128, 0.08);      /* 输入框/次级填充 */
+  --bg-fill-hover: rgba(120, 120, 128, 0.14);
+
+  --separator: rgba(60, 60, 67, 0.10);       /* 发丝分隔线 */
+  --separator-opaque: #e3e3e6;
+
+  /* ---- 圆角：连续、统一 ---- */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-small: 6px;
+  --radius-pill: 980px;
+
+  /* ---- 阴影：柔和弥散，不重 ---- */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 20px rgba(0, 0, 0, 0.05);
+  --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.12);
+
+  /* ---- 8pt 间距节奏 ---- */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* ---- 兼容旧令牌名 → 映射到新值（现有组件无需改即可刷新观感） ---- */
+  --primary-color: var(--accent);
+  --success-color: var(--green);
+  --warning-color: var(--orange);
+  --error-color: var(--red);
+  --text-primary: var(--label);
+  --text-secondary: var(--label-secondary);
+  --text-muted: var(--label-tertiary);
+  --bg-primary: var(--bg-card);
+  --bg-secondary: var(--bg-content);
+  --bg-hover: var(--bg-fill);
+  --border-light: var(--separator);
+  --border-base: var(--separator-opaque);
+  --shadow-light: var(--shadow-card);
+  --shadow-base: var(--shadow-card);
+  --radius-base: var(--radius-control);
+  --radius-large: var(--radius-card);
+  --font-xs: var(--text-footnote);
+  --font-sm: var(--text-body);
+  --font-base: var(--text-headline);
+  --font-lg: var(--text-title3);
+  --font-xl: var(--text-title);
+  --font-regular: var(--weight-regular);
+  --font-semibold: var(--weight-semibold);
+  --font-bold: var(--weight-bold);
+  --duration-fast: 180ms;
+  --duration-normal: 260ms;
+  --ease-in-out: cubic-bezier(0.32, 0.72, 0, 1);   /* 苹果常用缓动 */
+  --leading-normal: 1.5;
+  --width-wide: 100%;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--font-system);
+  font-size: var(--text-body);
+  color: var(--label);
+  background: var(--bg-window);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- 原生风格控件 ---- */
+
+/* iOS 开关（替代勾选框的观感）——组件里用 .switch 包裹 checkbox */
+.switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .track {
+  position: absolute; inset: 0; cursor: pointer; border-radius: var(--radius-pill);
+  background: rgba(120, 120, 128, 0.24); transition: background var(--duration-fast) var(--ease-in-out);
+}
+.switch .track::before {
+  content: ""; position: absolute; height: 20px; width: 20px; left: 2px; top: 2px;
+  background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform var(--duration-fast) var(--ease-in-out);
+}
+.switch input:checked + .track { background: var(--green); }
+.switch input:checked + .track::before { transform: translateX(16px); }
+
+/* 输入框 / 下拉：柔和内陷、圆角 */
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  font-family: inherit; font-size: var(--text-body); color: var(--label);
+  background: var(--bg-card); border: 1px solid var(--separator-opaque);
+  border-radius: var(--radius-control); padding: 8px 11px; transition: all var(--duration-fast) var(--ease-in-out);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+/* 自定义滚动条（macOS 细滚动条观感） */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: rgba(120, 120, 128, 0.35); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(120, 120, 128, 0.55); background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- element-plus 覆盖，统一到本设计系统 ---- */
+.el-button {
+  font-family: var(--font-system) !important; border-radius: var(--radius-control) !important;
+  font-weight: var(--weight-medium) !important;
+}
+.el-button--primary { background: var(--accent) !important; border-color: var(--accent) !important; }
+.el-button--primary:hover { background: var(--accent-hover) !important; border-color: var(--accent-hover) !important; }
+.el-button--danger { background: var(--red) !important; border-color: var(--red) !important; }
+.el-switch.is-checked .el-switch__core { background: var(--green) !important; border-color: var(--green) !important; }
+.el-message { border-radius: var(--radius-control) !important; box-shadow: var(--shadow-pop) !important; font-family: var(--font-system) !important; }
+.el-message-box { border-radius: var(--radius-card) !important; box-shadow: var(--shadow-pop) !important; }
+.el-dialog { border-radius: var(--radius-card) !important; box-shadow: var(--shadow-pop) !important; }

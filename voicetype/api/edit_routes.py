@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+# Copyright (C) 2026 VoiceType Contributors
+# Licensed under AGPL-3.0
+
+"""
+文本编辑动作 API。
+
+选中文字 → 编辑快捷键 → 后端广播 edit_menu_show → 前端菜单窗弹出 →
+用户选动作 → POST /api/edit/apply → 后端切回目标程序改写替换。
+菜单动作清单从后端拉取（单一真源，见 text_actions.py）。
+"""
+
+import logging
+
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+from ..pipeline.text_actions import actions_for_menu
+
+logger = logging.getLogger(__name__)
+
+edit_router = APIRouter(prefix="/api/edit")
+
+_engine = None
+
+
+def set_engine(engine):
+    global _engine
+    _engine = engine
+
+
+@edit_router.get("/actions")
+async def get_actions():
+    """返回预设动作清单（供前端菜单渲染）。"""
+    return {"actions": actions_for_menu()}
+
+
+class ApplyRequest(BaseModel):
+    action: str
+
+
+@edit_router.post("/apply")
+async def apply_action(req: ApplyRequest):
+    """套用某个预设动作到当前选区。"""
+    if not _engine:
+        return {"status": "error", "message": "engine not ready"}
+    await _engine.apply_edit_action(req.action)
+    return {"status": "ok"}
+
+
+@edit_router.post("/cancel")
+async def cancel():
+    """取消编辑，收起菜单。"""
+    if not _engine:
+        return {"status": "error", "message": "engine not ready"}
+    await _engine.cancel_edit()
+    return {"status": "ok"}

@@ -463,7 +463,7 @@ onMounted(() => {
 
 .card-hint-block {
   padding: var(--space-md);
-  background: #e6f7ff;
+  background: var(--accent-tint);
   border-left: 4px solid var(--primary-color);
   margin: var(--space-lg);
   border-radius: var(--radius-small);
@@ -530,7 +530,7 @@ onMounted(() => {
 
 .active-scene-banner {
   padding: var(--space-md);
-  background: #f0f8ff;
+  background: var(--accent-tint-strong);
   border: 1px solid var(--primary-color);
   border-left: 4px solid var(--primary-color);
   border-radius: var(--radius-small);
@@ -575,7 +575,7 @@ onMounted(() => {
 
 .scene-card.active {
   border-color: var(--primary-color);
-  background: #f0f8ff;
+  background: var(--accent-tint-strong);
 }
 
 .scene-card.disabled {
@@ -652,7 +652,7 @@ onMounted(() => {
 }
 
 .badge-primary {
-  background: #e6f7ff;
+  background: var(--accent-tint);
   color: var(--primary-color);
 }
 
@@ -716,7 +716,7 @@ onMounted(() => {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px #e6f7ff;
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 .form-group input::placeholder,
@@ -787,7 +787,7 @@ onMounted(() => {
 
 .tag-remove {
   border: none;
-  background: white;
+  background: rgba(255, 255, 255, 0.24);
   color: white;
   width: 18px;
   height: 18px;
@@ -801,7 +801,7 @@ onMounted(() => {
 }
 
 .tag-remove:hover {
-  background: white;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .dialog-overlay {
@@ -810,7 +810,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.32);
   display: flex;
   align-items: center;
   justify-content: center;

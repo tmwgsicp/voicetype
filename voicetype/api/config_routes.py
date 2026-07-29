@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..config import VoiceTypeConfig, save_config, mask_key
+from ..config import VoiceTypeConfig, save_config, mask_key, effective_asr_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +47,12 @@ class ConfigResponse(BaseModel):
     llm_model: str
     llm_temperature: float
     hotkey: str
+    edit_hotkey: str
     typing_delay_ms: int
     host: str
     port: int
     auto_start_asr: bool
+    auto_scene_enabled: bool
     # Voiceprint configuration
     voiceprint_enabled: bool
     voiceprint_provider: str
@@ -93,8 +95,10 @@ class ConfigUpdate(BaseModel):
     llm_model: Optional[str] = None
     llm_temperature: Optional[float] = None
     hotkey: Optional[str] = None
+    edit_hotkey: Optional[str] = None
     typing_delay_ms: Optional[int] = None
     auto_start_asr: Optional[bool] = None
+    auto_scene_enabled: Optional[bool] = None
     # Voiceprint configuration
     voiceprint_enabled: Optional[bool] = None
     voiceprint_provider: Optional[str] = None
@@ -117,23 +121,38 @@ async def update_config(update: ConfigUpdate):
     current = _current_config.model_dump()
     updates = update.model_dump(exclude_none=True)
 
-    # Don't overwrite keys with masked values
+    # 保护 API Key 不被误删/误覆盖。对三个 Key 字段：
+    #   - 打码值（如 sk-abc...xyz）= 用户未修改的回显值 → 丢弃，保留真实值
+    #   - 空串 = 未填写 / 输入框被清空 → 丢弃，保留真实值（清空 Key 不通过此接口）
+    # 只有用户填入的真实新值才会覆盖。避免因回显或清空导致 Key 丢失。
     for key in ("asr_api_key", "asr_secret_key", "llm_api_key"):
-        if key in updates and "..." in updates[key]:
+        if key in updates and (updates[key] == "" or "..." in updates[key]):
             del updates[key]
-    
-    # 如果前端删除了 API Keys（使用 Keyring），保留当前配置中的值
-    # 这样热重载时才能正确判断是否启用 LLM/云 ASR
-    if "asr_api_key" not in updates and current.get("asr_api_key"):
-        pass  # Keep existing
-    if "asr_secret_key" not in updates and current.get("asr_secret_key"):
-        pass  # Keep existing
-    if "llm_api_key" not in updates and current.get("llm_api_key"):
-        pass  # Keep existing
 
     current.update(updates)
     _current_config = VoiceTypeConfig(**current)
     save_config(_current_config)
+
+    # 热更新"自动切换场景"开关（无需重启）
+    if "auto_scene_enabled" in updates and _engine_instance:
+        _engine_instance._auto_scene_enabled = _current_config.auto_scene_enabled
+        logger.info("Auto-scene switching %s", "enabled" if _current_config.auto_scene_enabled else "disabled")
+
+    # 热重载全局快捷键（改了快捷键无需重启即可生效）
+    if "hotkey" in updates and _engine_instance:
+        try:
+            import asyncio
+            asyncio.create_task(_engine_instance.reload_hotkey(_current_config.hotkey))
+        except Exception as e:
+            logger.error("Failed to reload hotkey: %s", e)
+
+    # 热重载语音编辑快捷键
+    if "edit_hotkey" in updates and _engine_instance:
+        try:
+            import asyncio
+            asyncio.create_task(_engine_instance.reload_edit_hotkey(_current_config.edit_hotkey))
+        except Exception as e:
+            logger.error("Failed to reload edit hotkey: %s", e)
 
     logger.info("Config updated: %s", list(updates.keys()))
     
@@ -157,7 +176,7 @@ async def update_config(update: ConfigUpdate):
         try:
             _engine_instance.reload_asr_config(
                 asr_provider=_current_config.asr_provider,
-                asr_api_key=_current_config.asr_api_key,
+                asr_api_key=effective_asr_api_key(_current_config),
                 asr_secret_key=_current_config.asr_secret_key,
                 asr_model=_current_config.asr_model,
                 asr_max_silence_ms=_current_config.asr_max_silence_ms,

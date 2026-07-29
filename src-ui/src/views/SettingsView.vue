@@ -3,49 +3,59 @@
   Licensed under AGPL-3.0
 -->
 <template>
-  <div class="settings-view">
-    <div class="tabs-container">
-      <div class="tabs">
-        <button 
-          :class="['tab', { active: activeTab === 'api' }]"
-          @click="activeTab = 'api'"
-        >
-          API 配置
+  <div class="settings-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><NavIcon name="voiceprint" /></div>
+        <span class="brand-name">VoiceType</span>
+      </div>
+      <nav class="nav">
+        <button :class="['nav-item', { active: activeTab === 'overview' }]" @click="activeTab = 'overview'">
+          <NavIcon name="overview" /><span>概览</span>
         </button>
-        <button 
-          :class="['tab', { active: activeTab === 'rules' }]"
-          @click="activeTab = 'rules'"
-        >
-          术语规则
+
+        <div class="nav-group">听写</div>
+        <button :class="['nav-item', { active: activeTab === 'api' }]" @click="activeTab = 'api'">
+          <NavIcon name="api" /><span>模型与密钥</span>
         </button>
-        <button 
-          :class="['tab', { active: activeTab === 'scenes' }]"
-          @click="activeTab = 'scenes'"
-        >
-          场景管理
+        <button :class="['nav-item', { active: activeTab === 'general' }]" @click="activeTab = 'general'">
+          <NavIcon name="general" /><span>快捷键与启动</span>
         </button>
-        <button 
-          :class="['tab', { active: activeTab === 'voiceprint' }]"
-          @click="activeTab = 'voiceprint'"
-        >
-          声纹识别
+
+        <div class="nav-group">个性化</div>
+        <button :class="['nav-item', { active: activeTab === 'scenes' }]" @click="activeTab = 'scenes'">
+          <NavIcon name="scenes" /><span>场景</span>
         </button>
-        <button 
-          :class="['tab', { active: activeTab === 'general' }]"
-          @click="activeTab = 'general'"
-        >
-          通用设置
+        <button :class="['nav-item', { active: activeTab === 'rules' }]" @click="activeTab = 'rules'">
+          <NavIcon name="rules" /><span>术语规则</span>
         </button>
+        <button :class="['nav-item', { active: activeTab === 'voiceprint' }]" @click="activeTab = 'voiceprint'">
+          <NavIcon name="voiceprint" /><span>声纹</span>
+        </button>
+
+        <div class="nav-group">数据</div>
+        <button :class="['nav-item', { active: activeTab === 'stats' }]" @click="activeTab = 'stats'">
+          <NavIcon name="stats" /><span>统计</span>
+        </button>
+        <button :class="['nav-item', { active: activeTab === 'history' }]" @click="activeTab = 'history'">
+          <NavIcon name="history" /><span>历史</span>
+        </button>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <!-- Overview -->
+      <div v-if="activeTab === 'overview'" class="page">
+        <h1 class="page-title">概览</h1>
+        <OverviewView @go="activeTab = $event" />
       </div>
 
       <!-- API Config Tab -->
       <div v-if="activeTab === 'api'" class="tab-content">
+        <h1 class="page-title">模型与密钥</h1>
         <div class="content-grid">
           <!-- Main Config Card -->
           <section class="unified-card">
-            <div class="card-header">
-              <span class="card-title">API 配置</span>
-            </div>
             <div class="card-hint-block">ASR 和 LLM 可共用同一个阿里云 DashScope API Key</div>
 
             <!-- ASR Section -->
@@ -121,7 +131,7 @@
                     step="0.05"
                     class="slider"
                   >
-                  <p class="form-help">越低越敏感，越高越不容易触发（0.45 默认，0.55 减少杂音，0.65 安静环境）</p>
+                  <p class="form-help">越低越敏感，越高越不容易触发（0.5 默认，0.55 减少杂音，0.65 安静环境）</p>
                 </div>
               </div>
             </div>
@@ -130,12 +140,12 @@
             <div class="form-section">
               <h3 class="form-section-title">关键词唤醒 (Wake Word)</h3>
 
-              <div class="form-group">
-                <div class="checkbox-group">
-                  <input type="checkbox" id="kws-enabled" v-model="config.sherpa_kws_enabled">
-                  <label for="kws-enabled">启用语音唤醒功能</label>
+              <div class="switch-row">
+                <div class="switch-text">
+                  <span>启用语音唤醒功能</span>
+                  <p class="form-help">基于本地 KWS 模型后台监听唤醒词，检测到后自动开始录音</p>
                 </div>
-                <p class="form-help">基于本地 Sherpa-ONNX KWS 模型，后台持续监听唤醒词，检测到后自动开始录音</p>
+                <label class="switch"><input type="checkbox" v-model="config.sherpa_kws_enabled"><span class="track"></span></label>
               </div>
 
               <div v-if="config.sherpa_kws_enabled" class="kws-info-box">
@@ -202,43 +212,57 @@
 
       <!-- Rules Tab -->
       <div v-if="activeTab === 'rules'" class="tab-content">
+        <h1 class="page-title">术语规则</h1>
         <RuleManager />
       </div>
 
       <!-- Scenes Tab -->
       <div v-if="activeTab === 'scenes'" class="tab-content">
+        <h1 class="page-title">场景</h1>
         <SceneManager />
       </div>
 
       <!-- Voiceprint Tab -->
       <div v-if="activeTab === 'voiceprint'" class="tab-content">
+        <h1 class="page-title">声纹</h1>
         <VoiceprintManager />
       </div>
 
       <!-- General Settings Tab -->
       <div v-if="activeTab === 'general'" class="tab-content">
+        <h1 class="page-title">快捷键与启动</h1>
         <div class="content-grid">
           <section class="unified-card">
-            <div class="card-header">
-              <span class="card-title">快捷键与启动</span>
-            </div>
-
             <div class="form-section">
               <h3 class="form-section-title">快捷键设置</h3>
-              <div class="form-group">
-                <label>全局录音快捷键</label>
-                <input type="text" v-model="config.hotkey" placeholder="<f9>">
-                <p class="form-help">格式：&lt;f9&gt; 或 &lt;ctrl&gt;+&lt;shift&gt;+v（使用 pynput 格式）</p>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>听写快捷键</label>
+                  <input type="text" v-model="config.hotkey" placeholder="<f9>">
+                  <p class="form-help">按一下开始/结束录音（pynput 格式）</p>
+                </div>
+                <div class="form-group">
+                  <label>文本编辑快捷键</label>
+                  <input type="text" v-model="config.edit_hotkey" placeholder="<f8>">
+                  <p class="form-help">选中文字后按它，弹预设动作菜单（默认 F8）</p>
+                </div>
+              </div>
+              <div class="card-hint-block" style="margin: var(--space-md) 0 0;">
+                💡 文本编辑：在任意应用里选中一段文字，按「文本编辑快捷键」，光标旁会弹出预设动作菜单（翻译 / 润色 / 精简 / 正式 / 要点），按数字键 1-5 或点击即可就地改写替换。需已配置 LLM。
               </div>
             </div>
 
             <div class="form-section">
-              <h3 class="form-section-title">启动行为</h3>
-              <div class="form-group">
-                <label class="checkbox-label">
-                  <input type="checkbox" v-model="config.auto_start_asr">
-                  <span>启动时自动开始录音</span>
-                </label>
+              <div class="switch-row">
+                <div class="switch-text"><span>启动时自动开始录音</span></div>
+                <label class="switch"><input type="checkbox" v-model="config.auto_start_asr"><span class="track"></span></label>
+              </div>
+              <div class="switch-row">
+                <div class="switch-text">
+                  <span>根据当前应用自动切换场景</span>
+                  <p class="form-help">关闭后只用手动选择的场景，不随应用自动切换</p>
+                </div>
+                <label class="switch"><input type="checkbox" v-model="config.auto_scene_enabled"><span class="track"></span></label>
               </div>
             </div>
 
@@ -249,7 +273,19 @@
           </section>
         </div>
       </div>
-    </div>
+
+      <!-- Stats Tab -->
+      <div v-if="activeTab === 'stats'" class="tab-content">
+        <h1 class="page-title">数据统计</h1>
+        <StatsView />
+      </div>
+
+      <!-- History Tab -->
+      <div v-if="activeTab === 'history'" class="tab-content">
+        <h1 class="page-title">历史</h1>
+        <HistoryView />
+      </div>
+    </main>
   </div>
 </template>
 
@@ -262,13 +298,16 @@ import StatusBar from '../components/StatusBar.vue'
 import RuleManager from '../components/RuleManager.vue'
 import SceneManager from '../components/SceneManager.vue'
 import VoiceprintManager from '../components/VoiceprintManager.vue'
-import { setPassword, getPassword } from 'tauri-plugin-keyring-api'
+import StatsView from './StatsView.vue'
+import HistoryView from './HistoryView.vue'
+import OverviewView from './OverviewView.vue'
+import NavIcon from '../components/NavIcon.vue'
 import { loadConfigWithMigration } from '../utils/configMigration'
 
 const api = useApi()
 const ws = useWebSocket()
 
-const activeTab = ref('api')
+const activeTab = ref('overview')
 
 const showAsrKey = ref(false)
 const showAsrSecret = ref(false)
@@ -290,50 +329,10 @@ const config = reactive({
   llm_model: 'qwen-turbo',
   llm_temperature: 0.3,
   hotkey: '<f9>',
+  edit_hotkey: '<f8>',
   auto_start_asr: false,
+  auto_scene_enabled: true,
 })
-
-// 从 Keyring 加载 API Keys
-async function loadApiKeysFromKeyring() {
-  try {
-    const asrKey = await getPassword('VoiceType', 'asr_api_key').catch(() => '')
-    const asrSecret = await getPassword('VoiceType', 'asr_secret_key').catch(() => '')
-    const llmKey = await getPassword('VoiceType', 'llm_api_key').catch(() => '')
-    
-    if (asrKey) config.asr_api_key = maskKey(asrKey)
-    if (asrSecret) config.asr_secret_key = maskKey(asrSecret)
-    if (llmKey) config.llm_api_key = maskKey(llmKey)
-  } catch (error) {
-    console.warn('Failed to load API keys from keyring:', error)
-  }
-}
-
-// 保存 API Keys 到 Keyring
-async function saveApiKeysToKeyring() {
-  const keysToSave = [
-    { service: 'VoiceType', account: 'asr_api_key', value: config.asr_api_key },
-    { service: 'VoiceType', account: 'asr_secret_key', value: config.asr_secret_key },
-    { service: 'VoiceType', account: 'llm_api_key', value: config.llm_api_key },
-  ]
-  
-  for (const { service, account, value } of keysToSave) {
-    try {
-      // 如果包含 "..."，说明是遮罩值，跳过
-      if (value && !value.includes('...')) {
-        await setPassword(service, account, value)
-      }
-    } catch (error) {
-      console.error(`Failed to save ${account} to keyring:`, error)
-      throw error
-    }
-  }
-}
-
-// 遮罩 API Key（显示前6位和后4位）
-function maskKey(key: string): string {
-  if (!key || key.length < 10) return '***'
-  return key.slice(0, 6) + '...' + key.slice(-4)
-}
 
 // KWS keywords as textarea text (one per line)
 const kwsKeywordsText = ref('小明同学\n你好语音')
@@ -356,7 +355,7 @@ const asrKeyHelp = computed(() => {
   if (config.asr_provider === 'sherpa') return '使用本地 ONNX 模型，无需任何 API 密钥'
   return config.asr_provider === 'tencent'
     ? '腾讯云 SecretId，在控制台获取'
-    : '阿里云 DashScope API Key，用于语音识别'
+    : '阿里云 DashScope Key（与下方 LLM 同一个）。留空将自动使用 LLM 的 Key'
 })
 
 const asrModelHelp = computed(() => {
@@ -380,6 +379,10 @@ const onProviderChange = () => {
     if (!config.asr_model || config.asr_model.startsWith('16k_') || config.asr_model === 'sherpa-local') {
       config.asr_model = 'qwen3-asr-flash-realtime'
     }
+    // 阿里云 ASR 与 LLM 共用同一个 DashScope Key：ASR 未单独填时自动带入 LLM 的 Key（预置）
+    if (!config.asr_api_key && config.llm_api_key) {
+      config.asr_api_key = config.llm_api_key
+    }
   }
 
   // KWS 与 ASR 完全独立，不再自动禁用
@@ -387,44 +390,10 @@ const onProviderChange = () => {
 
 const onSave = async () => {
   try {
-    let keyringSuccess = false
-    
-    // 1. 尝试保存 API Keys 到 OS Keyring（加密存储）
-    try {
-      await saveApiKeysToKeyring()
-      keyringSuccess = true
-      console.log('✅ API Keys saved to OS Keyring')
-    } catch (keyringError: any) {
-      console.warn('⚠️ Keyring save failed, will save to config.json as fallback:', keyringError)
-      keyringSuccess = false
-    }
-    
-    // 2. 准备配置数据
-    const configToSave: any = { ...config }
-    
-    // 如果 Keyring 保存成功，则从配置中移除 API Keys（由 Keyring 管理）
-    // 如果 Keyring 失败，则保留 API Keys 到 config.json（降级方案）
-    if (keyringSuccess) {
-      // 如果 API Key 是遮罩值，删除它们（后端会从 keyring 读取）
-      if (configToSave.asr_api_key && configToSave.asr_api_key.includes('...')) {
-        delete configToSave.asr_api_key
-      }
-      if (configToSave.asr_secret_key && configToSave.asr_secret_key.includes('...')) {
-        delete configToSave.asr_secret_key
-      }
-      if (configToSave.llm_api_key && configToSave.llm_api_key.includes('...')) {
-        delete configToSave.llm_api_key
-      }
-    }
-    
-    // 3. 保存配置到 config.json
-    await api.saveConfig(configToSave)
-    
-    if (keyringSuccess) {
-      ElMessage.success('配置已保存（API Keys 安全存储到系统密钥环）')
-    } else {
-      ElMessage.success('配置已保存（API Keys 存储到 config.json）')
-    }
+    // config.json 是唯一数据源，由后端独占持久化。
+    // 未修改的 Key 以打码形式回传，后端会自动丢弃、保留原值。
+    await api.saveConfig({ ...config })
+    ElMessage.success('配置已保存')
     saveStatus.value = ''
     statusColor.value = 'success'
   } catch (error: any) {
@@ -474,30 +443,90 @@ const onToggle = async () => {
 }
 
 onMounted(async () => {
-  try {
-    // 1. 加载并迁移配置（version-based migration）
-    const serverData = await api.getConfig()
-    const migrated = loadConfigWithMigration(config, serverData)
-    Object.assign(config, migrated)
-    
-    // 2. 从 Keyring 加载 API Keys（加密存储）
-    await loadApiKeysFromKeyring()
-    
-    // 3. Load KWS keywords into textarea
-    if (config.sherpa_keywords && Array.isArray(config.sherpa_keywords)) {
-      kwsKeywordsText.value = config.sherpa_keywords.join('\n')
+  // 后端启动需要几秒（含模型预热），重试拉取配置，避免"配置加载失败"误报。
+  let serverData: any = null
+  for (let attempt = 0; attempt < 15; attempt++) {
+    try {
+      serverData = await api.getConfig()
+      break
+    } catch (error) {
+      await new Promise(r => setTimeout(r, 600))
     }
-  } catch (error) {
-    console.error('Failed to load config:', error)
+  }
+
+  if (!serverData) {
+    console.error('Failed to load config after retries')
     ElMessage.warning('配置加载失败，使用默认值')
+    return
+  }
+
+  // 加载并迁移配置；API Keys 由后端以打码形式返回，直接进 config 展示。
+  const migrated = loadConfigWithMigration(config, serverData)
+  Object.assign(config, migrated)
+  if (config.sherpa_keywords && Array.isArray(config.sherpa_keywords)) {
+    kwsKeywordsText.value = config.sherpa_keywords.join('\n')
   }
 })
 </script>
 
 <style scoped>
-.settings-view {
-  min-height: 100vh;
-  background: var(--bg-secondary);
+.settings-shell {
+  display: flex;
+  height: 100vh;
+  background: var(--bg-content);
+}
+
+/* 侧边栏：半透明材质 + 分组 + 选中态填充（macOS 设置观感） */
+.sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-right: 1px solid var(--separator);
+  padding: var(--space-md) 10px var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.brand {
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-sm) var(--space-lg);
+}
+.brand-mark {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-mark :deep(svg) { width: 15px; height: 15px; }
+.brand-name { font-size: var(--text-headline); font-weight: var(--weight-semibold); color: var(--label); }
+
+.nav-group {
+  font-size: var(--text-caption); font-weight: var(--weight-semibold);
+  color: var(--label-tertiary); padding: var(--space-md) var(--space-sm) 4px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 7px 10px; border: none; background: none;
+  border-radius: var(--radius-control); cursor: pointer;
+  font-size: var(--text-body); color: var(--label); text-align: left;
+  transition: background var(--duration-fast) var(--ease-in-out);
+}
+.nav-item :deep(svg) { color: var(--label-secondary); flex-shrink: 0; }
+.nav-item:hover { background: var(--bg-fill); }
+.nav-item.active { background: var(--accent); color: #fff; }
+.nav-item.active :deep(svg) { color: #fff; }
+
+/* 内容区 */
+.content {
+  flex: 1; min-width: 0; overflow-y: auto;
+  padding: var(--space-2xl) var(--space-2xl) 60px;
+}
+.page { max-width: 780px; }
+.page-title {
+  font-size: var(--text-large-title); font-weight: var(--weight-bold);
+  color: var(--label); letter-spacing: -0.4px; margin: 0 0 var(--space-xl);
 }
 
 /* 紧凑状态栏 */
@@ -581,60 +610,34 @@ onMounted(async () => {
   font-weight: var(--font-semibold);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-in-out);
-  box-shadow: 0 2px 8px #bae7ff;
+  box-shadow: var(--shadow-card);
 }
 
 .btn-toggle:hover {
-  background: #40a9ff;
+  background: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px #bae7ff;
+  box-shadow: var(--shadow-card);
 }
 
-.tabs-container { 
-  max-width: var(--width-wide);
-  margin: 0 auto;
-  padding: var(--space-xl);
-}
+.tab-content { }
 
-.tabs {
+.content-grid {
   display: flex;
-  gap: 4px;
-  margin-bottom: 24px;
-  border-bottom: 2px solid var(--border-light);
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 780px;
 }
 
-.tab {
-  padding: 12px 24px;
-  border: none;
-  background: none;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  transition: all 0.2s;
+/* 开关行：左文字右原生开关（iOS/macOS 观感） */
+.switch-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-lg); padding: 6px 0;
 }
-
-.tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+.switch-row + .switch-row {
+  border-top: 1px solid var(--separator); margin-top: var(--space-sm); padding-top: var(--space-md);
 }
-
-.tab.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
-}
-
-.tab-content {}
-
-.content-grid { 
-  display: grid; 
-  grid-template-columns: 1fr; 
-  gap: var(--space-lg); 
-  max-width: 900px;
-  margin: 0 auto;
-}
+.switch-text > span { font-size: var(--text-body); color: var(--label); }
+.switch-text .form-help { margin-top: 2px; }
 
 .unified-card { 
   background: white;
@@ -654,7 +657,7 @@ onMounted(async () => {
 
 .card-hint-block {
   padding: var(--space-md);
-  background: #e6f7ff;
+  background: var(--accent-tint);
   border-left: 4px solid var(--primary-color);
   margin: var(--space-lg);
   border-radius: var(--radius-small);
@@ -690,7 +693,7 @@ onMounted(async () => {
 .form-group input:focus, .form-group select:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px #e6f7ff;
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 .input-row { display: flex; gap: var(--space-sm); }
@@ -718,8 +721,8 @@ onMounted(async () => {
   display: flex;
   gap: var(--space-md);
   padding: var(--space-md);
-  background: #f0f9ff;
-  border: 1px solid #bae6ff;
+  background: var(--bg-fill);
+  border: 1px solid var(--separator);
   border-radius: var(--radius-base);
   margin-bottom: var(--space-md);
 }
@@ -728,8 +731,8 @@ onMounted(async () => {
   display: flex;
   gap: var(--space-md);
   padding: var(--space-md);
-  background: #f6ffed;
-  border: 1px solid #b7eb8f;
+  background: var(--bg-fill);
+  border: 1px solid var(--separator);
   border-radius: var(--radius-base);
   margin-bottom: var(--space-md);
 }
@@ -741,7 +744,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1890ff;
+  background: var(--accent);
   color: white;
   border-radius: 50%;
   font-size: 18px;
@@ -755,13 +758,13 @@ onMounted(async () => {
 .info-title {
   font-size: var(--font-sm);
   font-weight: var(--font-semibold);
-  color: #0c4a6e;
+  color: var(--label);
   margin-bottom: 4px;
 }
 
 .info-text {
   font-size: var(--font-xs);
-  color: #075985;
+  color: var(--label-secondary);
   line-height: 1.5;
 }
 
@@ -784,7 +787,7 @@ onMounted(async () => {
 
 .btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
 .btn-primary { background: var(--primary-color); color: white; border-color: var(--primary-color); }
-.btn-primary:hover { background: #0077cc; }
+.btn-primary:hover { background: var(--accent-hover); }
 .btn-sm { padding: var(--space-xs) 10px; font-size: var(--font-xs); }
 
 .save-status { font-size: var(--font-xs); margin-left: var(--space-sm); }

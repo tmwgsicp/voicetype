@@ -41,15 +41,18 @@ class CustomScene:
         if self.app_rules is None:
             self.app_rules = []
     
-    def matches_app(self, app_name: str) -> bool:
-        """Check if this scene matches the given app name."""
+    def matches_app(self, app_name: str, window_title: str = "") -> bool:
+        """
+        Check if this scene matches the given window.
+        规则（子串、大小写不敏感）同时匹配应用名和窗口标题——这样浏览器里的
+        网页应用（如标题含 gmail / docs / feishu）也能被识别。
+        """
         if not self.app_rules:
             return False
-        
-        app_lower = app_name.lower()
+
+        haystack = f"{app_name} {window_title}".lower()
         for rule in self.app_rules:
-            rule_lower = rule.lower()
-            if rule_lower == app_lower or rule_lower in app_lower:
+            if rule.lower() in haystack:
                 return True
         return False
     
@@ -95,14 +98,21 @@ class SceneManager:
     
     def _load_builtin_scenes(self):
         """Load built-in default scenes."""
-        builtin_scenes = [
+        for scene in self._builtin_scene_defs():
+            self._scenes[scene.id] = scene
+
+    def _builtin_scene_defs(self) -> List["CustomScene"]:
+        """内置场景的代码定义（唯一真源，供加载和刷新使用）。"""
+        return [
             CustomScene(
                 id="code",
                 name="编程",
                 icon="💻",
                 prompt="保留所有技术术语原样（如 API、user_id、callback），不要翻译成中文。",
                 hotkey="",
-                app_rules=["cursor.exe", "vscode.exe", "pycharm", "idea"],
+                app_rules=["cursor", "code.exe", "vscode", "pycharm", "idea", "webstorm",
+                           "goland", "clion", "rider", "sublime", "trae", "android studio",
+                           "zed", "windsurf"],
                 builtin=True,
             ),
             CustomScene(
@@ -111,7 +121,8 @@ class SceneManager:
                 icon="📝",
                 prompt="正式书面语，补全标点，注意段落结构。",
                 hotkey="",
-                app_rules=["word", "wps", "notion", "obsidian"],
+                app_rules=["winword", "wps", "excel", "powerpnt", "notion", "obsidian",
+                           "腾讯文档", "语雀", "yuque", "飞书文档", "docs.google", "石墨"],
                 builtin=True,
             ),
             CustomScene(
@@ -120,7 +131,18 @@ class SceneManager:
                 icon="⌨️",
                 prompt="终端命令，保留命令和参数原样，不加标点。",
                 hotkey="",
-                app_rules=["cmd.exe", "powershell.exe", "terminal", "iterm"],
+                app_rules=["cmd.exe", "powershell", "pwsh", "windowsterminal", "wt.exe",
+                           "terminal", "iterm", "alacritty", "cmder", "warp", "hyper"],
+                builtin=True,
+            ),
+            CustomScene(
+                id="email",
+                name="邮件",
+                icon="✉️",
+                prompt="正式邮件语气，结构清晰，补全称呼和标点，商务得体。",
+                hotkey="",
+                app_rules=["outlook", "foxmail", "thunderbird", "gmail", "邮箱", "mail.qq",
+                           "网易邮箱", "mailmaster"],
                 builtin=True,
             ),
             CustomScene(
@@ -129,14 +151,16 @@ class SceneManager:
                 icon="💬",
                 prompt="保持口语化和简洁，不要改成书面语。",
                 hotkey="",
-                app_rules=["wechat", "qq", "dingtalk", "slack", "discord"],
+                app_rules=["wechat", "微信", "qq.exe", "tim", "dingtalk", "钉钉", "slack",
+                           "discord", "telegram", "teams", "feishu", "lark", "飞书",
+                           "企业微信", "wxwork", "whatsapp"],
                 builtin=True,
             ),
             CustomScene(
                 id="translate_to_en",
                 name="中译英",
                 icon="🌐",
-                prompt="将用户的中文口述翻译成地道的英文。保持专业、简洁、自然，适合任务管理和团队协作场景。不要逐字翻译，要表达核心意思。",
+                prompt="【翻译模式，覆盖上面的默认清理规则和禁止翻译规则】这是唯一允许翻译的场景。将用户口述的内容翻译成地道自然的英文，必须 100% 输出英文，绝对不要输出中文原文。先去掉口语和填充词再翻译，表达核心意思而非逐字直译，语气专业简洁。",
                 hotkey="<ctrl>+<shift>+1",
                 app_rules=[],
                 builtin=True,
@@ -151,10 +175,7 @@ class SceneManager:
                 builtin=True,
             ),
         ]
-        
-        for scene in builtin_scenes:
-            self._scenes[scene.id] = scene
-        
+
         logger.info(f"Loaded {len(builtin_scenes)} built-in scenes")
     
     def add_scene(self, scene: CustomScene) -> bool:
@@ -223,29 +244,27 @@ class SceneManager:
         return scene.to_scene()
     
     def auto_detect_scene(self, app_name: str) -> Optional[Scene]:
+        """Auto-detect scene based on app name (返回 pipeline 用的 Scene)。"""
+        cs = self.detect_scene(app_name)
+        return cs.to_scene() if cs else None
+
+    def detect_scene(self, app_name: str, window_title: str = "") -> Optional["CustomScene"]:
         """
-        Auto-detect scene based on app name.
-        基于应用名称自动检测场景。
-        
-        Returns None if manual override is active.
+        根据当前窗口自动匹配场景，返回 CustomScene（含提示词），供引擎应用。
+        手动覆盖生效时返回 None（不自动切换）。无匹配时回退到 general。
         """
         if self._manual_override:
             return None
-        
-        # Check app binding rules
+
         for scene in self._scenes.values():
-            if scene.enabled and scene.matches_app(app_name):
+            if scene.enabled and scene.id != "general" and scene.matches_app(app_name, window_title):
                 self._active_scene = scene
-                logger.info(f"Auto-detected scene: {scene.name} (app={app_name})")
-                return scene.to_scene()
-        
-        # Fallback to general
+                return scene
+
         general = self._scenes.get("general")
         if general:
             self._active_scene = general
-            return general.to_scene()
-        
-        return None
+        return general
     
     def clear_manual_override(self):
         """Clear manual override, back to auto-detection."""
@@ -293,7 +312,19 @@ class SceneManager:
             for scene_data in data.get("scenes", []):
                 scene = CustomScene.from_dict(scene_data)
                 self._scenes[scene.id] = scene
-            
+
+            # 用代码里的最新定义刷新内置场景的提示词/名称/图标（内置场景的行为以代码为准，
+            # 保留用户自定义的 app_rules/hotkey/enabled）。缺失的内置场景则补齐。
+            for bd in self._builtin_scene_defs():
+                existing = self._scenes.get(bd.id)
+                if existing and existing.builtin:
+                    existing.name = bd.name
+                    existing.icon = bd.icon
+                    existing.prompt = bd.prompt
+                elif existing is None:
+                    self._scenes[bd.id] = bd
+            self.save_scenes()
+
             logger.info(f"Loaded {len(self._scenes)} scenes from {self._scenes_file}")
         except Exception as e:
             logger.error(f"Failed to load scenes: {e}")

@@ -22,11 +22,11 @@
           </div>
         </div>
 
-        <div v-if="enabled && voiceprints.length === 0" class="card-hint-block" style="background: #fff7e6; border-left-color: var(--warning-color); color: #d46b08;">
+        <div v-if="enabled && voiceprints.length === 0" class="card-hint-block" style="background: rgba(255, 149, 0, 0.12); border-left-color: var(--orange); color: #a05000;">
           ⚠ 声纹识别已启用，但未注册声纹。请先注册您的声纹，系统才能识别您的声音。
         </div>
 
-        <div v-else-if="enabled && voiceprints.length > 0" class="card-hint-block" style="background: #f6ffed; border-left-color: var(--success-color); color: #389e0d;">
+        <div v-else-if="enabled && voiceprints.length > 0" class="card-hint-block" style="background: var(--bg-fill); border-left-color: var(--success-color); color: #389e0d;">
           ✓ 声纹识别运行中 · 已注册 {{ voiceprints.length }} 个声纹 · 按 F9 录音 → 自动验证声纹 → 通过后识别文字
         </div>
 
@@ -160,7 +160,7 @@
       <!-- Step 2: Processing -->
       <div v-if="enrollStep === 2" class="enroll-content">
         <div class="processing-ui">
-          <el-icon class="is-loading" :size="48" color="#1890ff">
+          <el-icon class="is-loading" :size="48" color="var(--accent)">
             <Loading />
           </el-icon>
           <div class="processing-text">正在提取声纹特征...</div>
@@ -460,6 +460,11 @@ watch(threshold, async (newValue) => {
 </script>
 
 <style scoped>
+:deep(.el-button) { border-radius: var(--radius-control) !important; }
+:deep(.el-dialog) { border-radius: var(--radius-card) !important; }
+:deep(.el-slider__bar) { background: var(--accent) !important; }
+:deep(.el-switch.is-checked .el-switch__core) { background: var(--accent) !important; border-color: var(--accent) !important; }
+
 .voiceprint-manager {
   padding: 0;
 }
@@ -511,7 +516,7 @@ watch(threshold, async (newValue) => {
 
 .card-hint-block {
   padding: var(--space-md);
-  background: #e6f7ff;
+  background: var(--accent-tint);
   border-left: 4px solid var(--primary-color);
   margin: var(--space-lg);
   border-radius: var(--radius-small);
@@ -703,7 +708,7 @@ watch(threshold, async (newValue) => {
   color: var(--primary-color);
   margin-bottom: var(--space-lg);
   padding: var(--space-sm) var(--space-md);
-  background: #e6f7ff;
+  background: var(--accent-tint);
   border-radius: var(--radius-base);
   display: inline-block;
 }

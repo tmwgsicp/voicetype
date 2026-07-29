@@ -257,10 +257,10 @@ fn show_windows(handle: &AppHandle) {
             if let Ok(monitor) = main_win.current_monitor() {
                 if let Some(monitor) = monitor {
                     let size = monitor.size();
-                    // 水平居中：x = (屏幕宽度 - 窗口宽度) / 2
-                    let x = (size.width as i32 - 170) / 2;
-                    // 距离底部 120px（留空间给任务栏）
-                    let y = size.height as i32 - 52 - 120;
+                    // 水平居中（胶囊窗口宽 320）
+                    let x = (size.width as i32 - 320) / 2;
+                    // 胶囊窗口高 52，距底部约 90px（留空间给任务栏）
+                    let y = size.height as i32 - 52 - 90;
                     let _ = float_win.set_position(tauri::Position::Physical(
                         tauri::PhysicalPosition::new(x, y),
                     ));
@@ -268,6 +268,58 @@ fn show_windows(handle: &AppHandle) {
             }
         }
     }
+}
+
+/// Position the edit-menu window near the cursor (physical coords), then show + focus it.
+fn show_edit_menu(handle: &AppHandle, cursor_x: i32, cursor_y: i32) {
+    let win = match handle.get_webview_window("edit-menu") {
+        Some(w) => w,
+        None => return,
+    };
+
+    // 窗口物理尺寸（用于避免弹出后超出屏幕）
+    let (win_w, win_h) = win
+        .outer_size()
+        .map(|s| (s.width as i32, s.height as i32))
+        .unwrap_or((212, 300));
+
+    // 找到光标所在的显示器，取其边界做钳制（多屏也正确）
+    let (mut mon_x, mut mon_y, mut mon_w, mut mon_h) = (0i32, 0i32, 1920i32, 1080i32);
+    if let Ok(monitors) = win.available_monitors() {
+        for mon in monitors {
+            let p = mon.position();
+            let s = mon.size();
+            let (px, py, sw, sh) = (p.x, p.y, s.width as i32, s.height as i32);
+            if cursor_x >= px && cursor_x < px + sw && cursor_y >= py && cursor_y < py + sh {
+                mon_x = px;
+                mon_y = py;
+                mon_w = sw;
+                mon_h = sh;
+                break;
+            }
+        }
+    }
+
+    // 默认放在光标右下方；贴近右/下边缘时翻到另一侧
+    let mut x = cursor_x + 12;
+    let mut y = cursor_y + 12;
+    if x + win_w > mon_x + mon_w {
+        x = cursor_x - win_w - 12;
+    }
+    if y + win_h > mon_y + mon_h {
+        y = mon_y + mon_h - win_h - 8;
+    }
+    if x < mon_x {
+        x = mon_x + 8;
+    }
+    if y < mon_y {
+        y = mon_y + 8;
+    }
+
+    let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x, y)));
+    // 注意：不要 set_focus——菜单窗是非激活窗口（见 make_edit_menu_noactivate），
+    // 抢焦点会导致目标程序丢失选区，改写就变成插入而非替换。键盘由后端全局捕获。
+    let _ = win.show();
 }
 
 /// Connect to Python backend WebSocket and relay recording events to Tauri frontend.
@@ -284,7 +336,22 @@ async fn relay_ws_events(handle: &AppHandle, port: u16) {
                 while let Some(Ok(msg)) = ws.next().await {
                     if let tokio_tungstenite::tungstenite::Message::Text(text) = msg {
                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                            // 先广播给所有前端窗口（编辑菜单窗据此渲染动作/预览）
                             let _ = handle.emit("backend-event", &json);
+                            // 再由 Rust 控制菜单窗的显示/定位/隐藏
+                            match json.get("type").and_then(|v| v.as_str()) {
+                                Some("edit_menu_show") => {
+                                    let x = json.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                                    let y = json.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                                    show_edit_menu(handle, x, y);
+                                }
+                                Some("edit_menu_hide") => {
+                                    if let Some(w) = handle.get_webview_window("edit-menu") {
+                                        let _ = w.hide();
+                                    }
+                                }
+                                _ => {}
+                            }
                         }
                     }
                 }

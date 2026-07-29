@@ -80,44 +80,26 @@ class SherpaKWSExtension(Extension):
             if not keywords_file.endswith("keywords.txt"):
                 keywords_file = f"{model_dir}/keywords.txt"
             
-            # 生成编码后的关键词文件
-            import tempfile
-            import subprocess
-            
             # 从配置读取用户定义的关键词
             user_keywords = self.config.custom_config.get("keywords", ["小明同学", "你好语音"])
-            
-            # 创建临时输入文件
-            temp_input = tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False, suffix='.txt')
-            for kw in user_keywords:
-                temp_input.write(f"{kw}\n")
-            temp_input.close()
-            
-            # 使用 sherpa-onnx-cli 转换
+
+            # 用 sherpa-onnx 的「进程内」API 把关键词编码成 ppinyin token，
+            # 不再依赖打包后不存在的 sherpa-onnx-cli 命令行工具。
             tokens_file = f"{model_dir}/tokens.txt"
-            result = subprocess.run(
-                [
-                    "sherpa-onnx-cli", "text2token",
-                    "--tokens", tokens_file,
-                    "--tokens-type", "ppinyin",
-                    temp_input.name,
-                    keywords_file
-                ],
-                capture_output=True,
-                text=True,
-                check=True
+            encoded = sherpa_onnx.text2token(
+                user_keywords,
+                tokens=tokens_file,
+                tokens_type="ppinyin",
             )
-            
-            # 读取转换后的关键词
-            with open(keywords_file, "r", encoding="utf-8") as f:
-                self._keywords = [line.strip() for line in f if line.strip()]
-            
+            self._keywords = [" ".join(toks) for toks in encoded if toks]
+
+            # 写入编码后的关键词文件（keywords_file 已指向可写的配置目录）供 KeywordSpotter 使用
+            with open(keywords_file, "w", encoding="utf-8") as f:
+                for line in self._keywords:
+                    f.write(line + "\n")
+
             logger.info(f"Converted {len(user_keywords)} keywords to tokens: {user_keywords} -> {self._keywords}")
-            
-            # 清理临时文件
-            import os
-            os.unlink(temp_input.name)
-            
+
         except Exception as e:
             logger.error(f"Failed to convert keywords: {e}")
             self._keywords = []

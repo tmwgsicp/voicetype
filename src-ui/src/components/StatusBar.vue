@@ -74,7 +74,7 @@ function onToggle() {
 }
 .btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
 .btn-primary { background: var(--primary-color); color: white; border-color: var(--primary-color); }
-.btn-primary:hover { background: #40a9ff; border-color: #40a9ff; color: white; }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: white; }
 .btn-record { display: inline-flex; align-items: center; gap: var(--space-sm); font-weight: var(--font-semibold); flex-shrink: 0; }
 .btn-record.recording { background: var(--error-color); border-color: var(--error-color); }
 .btn-record.recording:hover { background: #ff7875; border-color: #ff7875; }

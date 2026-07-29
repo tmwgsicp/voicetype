@@ -14,6 +14,33 @@ use tauri::{
 
 mod sidecar;
 
+/// 把编辑菜单窗设为「非激活」窗口（WS_EX_NOACTIVATE + TOOLWINDOW）。
+/// 这样它弹出/被点击时都不会抢走目标程序的焦点——目标程序里的文字选区得以保留，
+/// 套用改写时粘贴才能正确「替换」而不是「插入到前面」。
+#[cfg(windows)]
+fn make_edit_menu_noactivate(app: &tauri::AppHandle) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    };
+    if let Some(win) = app.get_webview_window("edit-menu") {
+        if let Ok(hwnd) = win.hwnd() {
+            let h = hwnd.0 as _;
+            unsafe {
+                let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
+                SetWindowLongPtrW(
+                    h,
+                    GWL_EXSTYLE,
+                    ex | WS_EX_NOACTIVATE as isize | WS_EX_TOOLWINDOW as isize,
+                );
+            }
+            log::info!("edit-menu window set to no-activate");
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn make_edit_menu_noactivate(_app: &tauri::AppHandle) {}
+
 struct AppState {
     port: Mutex<u16>,
     sidecar_child: Mutex<Option<Child>>,
@@ -36,6 +63,22 @@ async fn toggle_recording(state: tauri::State<'_, AppState>) -> Result<serde_jso
         .map_err(|e| e.to_string())?;
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
     Ok(json)
+}
+
+#[tauri::command]
+fn hide_edit_menu(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("edit-menu") {
+        let _ = w.hide();
+    }
+}
+
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
 }
 
 #[tauri::command]
@@ -67,7 +110,6 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_keyring::init())
         .manage(AppState {
             port: Mutex::new(port),
             sidecar_child: Mutex::new(None),
@@ -76,6 +118,8 @@ fn main() {
             get_port,
             toggle_recording,
             get_status,
+            show_main_window,
+            hide_edit_menu,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -109,6 +153,9 @@ fn main() {
                     }
                 })
                 .build(app)?;
+
+            // 编辑菜单窗设为非激活，避免抢焦点导致选区丢失（否则粘贴会变成插入而非替换）
+            make_edit_menu_noactivate(&handle);
 
             // Prevent main window from closing, just hide it
             let main_window = app.get_webview_window("main").unwrap();

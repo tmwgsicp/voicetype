@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         main: './index.html',
         floating: './floating.html',
+        'edit-menu': './edit-menu.html',
       },
     },
   },

@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
   "productName": "VoiceType",
   "identifier": "com.tmwgsicp.voicetype2",
+  "version": "0.2.0",
   "build": {
     "frontendDist": "../src-ui/dist",
     "devUrl": "http://localhost:5173",
@@ -28,10 +29,11 @@
         "label": "floating",
         "title": "",
         "url": "/floating.html",
-        "width": 170,
+        "width": 320,
         "height": 52,
         "decorations": false,
         "transparent": true,
+        "shadow": false,
         "alwaysOnTop": true,
         "resizable": false,
         "skipTaskbar": true,
@@ -39,13 +41,24 @@
         "center": false,
         "x": 800,
         "y": 900
+      },
+      {
+        "label": "edit-menu",
+        "title": "",
+        "url": "/edit-menu.html",
+        "width": 212,
+        "height": 300,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "center": false
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": false,
-      "tooltip": "VoiceType - AI 语音输入"
-    },
     "security": {
       "csp": null
     }
@@ -71,7 +84,11 @@
       "minimumSystemVersion": "10.13"
     },
     "windows": {
-      "nsis": {}
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": false
+      }
     }
   },
   "plugins": {}

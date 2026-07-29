@@ -33,8 +33,13 @@ def set_scene_engine(engine):
 
 
 def get_scene_manager() -> SceneManager:
-    """Get or create global SceneManager instance."""
+    """
+    返回全局唯一的 SceneManager。优先用引擎持有的那个实例，保证"UI 管理的场景"
+    和"引擎自动检测用的场景"是同一份（单一真源）。
+    """
     global _scene_manager
+    if _engine is not None and getattr(_engine, "scene_manager", None) is not None:
+        return _engine.scene_manager
     if _scene_manager is None:
         _scene_manager = SceneManager(scenes_file=SCENES_FILE)
     return _scene_manager
@@ -206,12 +211,16 @@ async def switch_scene(scene_id: str, manual: bool = True):
     
     try:
         pipeline_scene = manager.switch_scene(scene_id, manual=manual)
-        
+
         # Update engine pipeline
         if _engine:
             _engine.pipeline.set_scene(pipeline_scene)
             _engine.pipeline.set_custom_prompt(manager.get_scene(scene_id).prompt)
-        
+            # 手动选择场景时，抑制引擎的窗口自动场景检测，否则会每秒把场景覆盖回
+            # 当前窗口对应的场景（比如翻译场景被覆盖回"文档"，导致不翻译）。
+            if manual:
+                _engine._scene_override = scene_id
+
         return {
             "success": True,
             "scene": scene_id,
@@ -229,9 +238,10 @@ async def clear_scene_override():
     """
     manager = get_scene_manager()
     manager.clear_manual_override()
-    
-    # Trigger auto-detection with current window
+
+    # 恢复引擎的窗口自动场景检测
     if _engine:
+        _engine._scene_override = None
         window = _engine.window_watcher.current
         if window:
             detected_scene = manager.auto_detect_scene(window.app_name)

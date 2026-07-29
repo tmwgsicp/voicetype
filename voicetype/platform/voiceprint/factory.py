@@ -8,6 +8,7 @@ Voiceprint service factory.
 """
 
 import logging
+import os
 from typing import Optional
 
 from .base import BaseVoiceprintService, VoiceprintProvider
@@ -81,9 +82,12 @@ class VoiceprintServiceFactory:
                 model_path = config.get("model_path", "models/speaker_recognition.onnx")
                 storage_dir = config.get("storage_dir", "data/voiceprints")
                 
-                # 解析模型路径
+                # 只对模型文件用 resolve_model_path；storage_dir 是「可写数据目录」，
+                # 不能走只读模型解析器（目录不存在时会抛错）。相对路径放到配置目录下。
                 model_path = resolve_model_path(model_path)
-                storage_dir = resolve_model_path(storage_dir)
+                if not os.path.isabs(storage_dir):
+                    from ...config import get_config_dir
+                    storage_dir = str(get_config_dir() / "voiceprints")
                 
                 sample_rate = config.get("sample_rate", 16000)
                 threshold = config.get("threshold", 0.5)

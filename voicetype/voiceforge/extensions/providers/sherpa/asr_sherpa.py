@@ -50,51 +50,74 @@ class SherpaASRExtension(Extension):
         Port("partial_text", PortType.TEXT, "Intermediate recognition result", required=False),
     ]
 
+    # 已加载识别器的缓存（按模型绝对路径）。实现"模型常驻"：
+    # 首次加载模型约 3-4 秒，缓存后每次录音只需 create_stream()（毫秒级），
+    # 消除按 F9 后要等几秒才变红的延迟。识别器是无状态模型，可安全复用于多个 stream。
+    _recognizer_cache: dict = {}
+
+    @classmethod
+    def _get_recognizer(cls, model_dir: str):
+        """获取指定模型的识别器；首次加载并缓存，之后直接复用（常驻）。"""
+        abs_dir = resolve_model_path(model_dir)
+
+        cached = cls._recognizer_cache.get(abs_dir)
+        if cached is not None:
+            logger.info(f"Reusing warm Sherpa-ONNX recognizer: {abs_dir}")
+            return cached
+
+        is_bilingual = "bilingual" in abs_dir.lower() or "zh-en" in abs_dir.lower()
+        logger.info(f"Loading Sherpa-ONNX model (first time, will be cached): {abs_dir}")
+        logger.info(f"Model type: {'Bilingual (中英混合)' if is_bilingual else 'Chinese-only (纯中文)'}")
+
+        recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
+            tokens=f"{abs_dir}/tokens.txt",
+            encoder=f"{abs_dir}/encoder-epoch-99-avg-1.onnx",
+            decoder=f"{abs_dir}/decoder-epoch-99-avg-1.onnx",
+            joiner=f"{abs_dir}/joiner-epoch-99-avg-1.onnx",
+            num_threads=4,
+            sample_rate=16000,
+            feature_dim=80,
+            enable_endpoint_detection=True,
+            rule1_min_trailing_silence=2.0,  # 提高到2s，减少误触发
+            rule2_min_trailing_silence=1.4,  # 提高到1.4s
+            rule3_min_utterance_length=25.0,  # 提高到25，避免过短片段
+            decoding_method="greedy_search",
+            max_active_paths=4,
+            hotwords_score=1.5,
+            provider="cpu",
+        )
+        cls._recognizer_cache[abs_dir] = recognizer
+        logger.info("Sherpa-ONNX model loaded and cached (warm, subsequent starts are instant)")
+        return recognizer
+
+    @classmethod
+    def prewarm(cls, model_dir: str):
+        """在后台预加载模型到缓存，让用户第一次按 F9 也能秒开。"""
+        try:
+            cls._get_recognizer(model_dir)
+        except Exception as e:
+            logger.warning(f"Sherpa-ONNX prewarm failed (will load on first use): {e}")
+
     def __init__(self, config: ASRConfig):
         if sherpa_onnx is None:
             raise ImportError("sherpa-onnx not installed. Install: pip install sherpa-onnx")
-        
+
         super().__init__(config)
-        
+
         # 从配置中获取模型路径
-        model_dir = self.config.custom_config.get("model_dir", "models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23")
-        
-        # 解析为绝对路径
-        model_dir = resolve_model_path(model_dir)
-        
-        # 检测是否为双语模型
-        is_bilingual = "bilingual" in model_dir.lower() or "zh-en" in model_dir.lower()
-        
-        logger.info(f"Initializing Sherpa-ONNX ASR with model: {model_dir}")
-        logger.info(f"Model type: {'Bilingual (中英混合)' if is_bilingual else 'Chinese-only (纯中文)'}")
-        
-        # 使用新版 API 初始化识别器
+        model_dir = self.config.custom_config.get("model_dir", "models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20")
+
+        # 获取（或首次加载）识别器 —— 命中缓存则瞬间返回
         try:
-            self._recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
-                tokens=f"{model_dir}/tokens.txt",
-                encoder=f"{model_dir}/encoder-epoch-99-avg-1.onnx",
-                decoder=f"{model_dir}/decoder-epoch-99-avg-1.onnx",
-                joiner=f"{model_dir}/joiner-epoch-99-avg-1.onnx",
-                num_threads=4,
-                sample_rate=16000,
-                feature_dim=80,
-                enable_endpoint_detection=True,
-                rule1_min_trailing_silence=2.0,  # 提高到2s，减少误触发
-                rule2_min_trailing_silence=1.4,  # 提高到1.4s
-                rule3_min_utterance_length=25.0,  # 提高到25，避免过短片段
-                decoding_method="greedy_search",
-                max_active_paths=4,
-                hotwords_score=1.5,
-                provider="cpu",
-            )
+            self._recognizer = self._get_recognizer(model_dir)
         except Exception as e:
             logger.error(f"Failed to initialize Sherpa-ONNX recognizer: {e}")
             raise
-        
+
         self._stream: Optional[sherpa_onnx.OnlineStream] = None
         self._last_text = ""
-        
-        logger.info(f"[{self.config.name}] Sherpa-ONNX ASR initialized successfully")
+
+        logger.info(f"[{self.config.name}] Sherpa-ONNX ASR ready")
 
     async def _do_start(self):
         """启动识别器"""

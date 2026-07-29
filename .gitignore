@@ -83,3 +83,6 @@ docs/
 
 # Tauri
 src-tauri/binaries/
+
+# stale sidecar snapshot (build uses dist/voicetype-server)
+src-ui/src-tauri/binaries/

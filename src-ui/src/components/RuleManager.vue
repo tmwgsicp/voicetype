@@ -396,7 +396,7 @@ onMounted(() => {
 
 .card-hint-block {
   padding: var(--space-md);
-  background: #e6f7ff;
+  background: var(--accent-tint);
   border-left: 4px solid var(--primary-color);
   margin: var(--space-lg);
   border-radius: var(--radius-small);
@@ -557,7 +557,7 @@ onMounted(() => {
 
 .rule-flag {
   padding: var(--space-xs) var(--space-sm);
-  background: #fff7e6;
+  background: rgba(255, 149, 0, 0.12);
   color: var(--warning-color);
   border-radius: var(--radius-small);
   font-weight: var(--font-semibold);
@@ -596,7 +596,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: var(--bg-fill-hover);
   transition: 0.3s;
   border-radius: 24px;
 }
@@ -614,7 +614,7 @@ onMounted(() => {
 }
 
 input:checked + .toggle-slider {
-  background-color: var(--primary-color);
+  background: var(--accent);
 }
 
 input:checked + .toggle-slider:before {
@@ -677,7 +677,7 @@ input:checked + .toggle-slider:before {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px #e6f7ff;
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 .form-group input::placeholder,
@@ -704,7 +704,7 @@ input:checked + .toggle-slider:before {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.32);
   display: flex;
   align-items: center;
   justify-content: center;

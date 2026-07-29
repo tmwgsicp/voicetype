@@ -31,10 +31,12 @@ from pathlib import Path
 from .engine import VoiceTypingEngine
 from .api.routes import router, set_engine
 from .api.config_routes import config_router, set_config, set_engine as set_config_engine
-from .api.rule_routes import rule_router
+from .api.rule_routes import rule_router, set_rule_engine
 from .api.scene_routes import scene_router, set_scene_engine
 from .api.voiceprint_routes import voiceprint_router, set_engine_instance
-from .config import load_config, VoiceTypeConfig
+from .api.stats_routes import stats_router
+from .api.edit_routes import edit_router, set_engine as set_edit_engine
+from .config import load_config, VoiceTypeConfig, effective_asr_api_key
 
 load_dotenv()
 
@@ -180,6 +182,19 @@ async def lifespan(app: FastAPI):
     global engine
 
     config = load_config()
+
+    # 一次性迁移旧的自动默认值到 F8：
+    #   <f10> 会触发 Word 菜单；<ctrl>+<alt>+e 三键难记。两者都是历史自动默认，安全替换。
+    if config.edit_hotkey in ("<f10>", "<ctrl>+<alt>+e"):
+        old = config.edit_hotkey
+        config.edit_hotkey = "<f8>"
+        try:
+            from .config import save_config as _save
+            _save(config)
+            logger.info("Migrated edit_hotkey %s -> <f8>", old)
+        except Exception as e:
+            logger.warning("edit_hotkey migration failed: %s", e)
+
     set_config(config)
 
     if not config.llm_api_key:
@@ -190,7 +205,7 @@ async def lifespan(app: FastAPI):
         llm_base_url=config.llm_base_url,
         llm_model=config.llm_model,
         asr_provider=config.asr_provider,
-        asr_api_key=config.asr_api_key,
+        asr_api_key=effective_asr_api_key(config),
         asr_secret_key=config.asr_secret_key,
         asr_model=config.asr_model,
         asr_max_silence_ms=config.asr_max_silence_ms,
@@ -202,30 +217,37 @@ async def lifespan(app: FastAPI):
         sherpa_keywords=config.sherpa_keywords,
         hotkey=config.hotkey,
         typing_delay_ms=config.typing_delay_ms,
+        auto_scene_enabled=config.auto_scene_enabled,
+        edit_hotkey=config.edit_hotkey,
     )
     set_engine(engine)
     set_config_engine(engine)  # Set engine for config hot reload
     set_scene_engine(engine)
+    set_rule_engine(engine)    # 规则 API 与 pipeline 共用一个 RuleReplacer（改规则即时生效）
     set_engine_instance(engine)
+    set_edit_engine(engine)    # 文本编辑动作 API
     await engine.start()
     
-    # 加载并应用持久化的声纹设置
-    from .config import get_config_dir
-    voiceprint_settings_file = get_config_dir() / "voiceprint_settings.json"
-    if voiceprint_settings_file.exists():
+    # 声纹设置统一到 config.json（单一真源）。若存在旧的 voiceprint_settings.json，
+    # 一次性把它的值迁移进 config 后删除，消除"双存储脑裂"。
+    from .config import get_config_dir, save_config
+    vp_file = get_config_dir() / "voiceprint_settings.json"
+    if vp_file.exists():
         try:
             import json
-            with open(voiceprint_settings_file, 'r', encoding='utf-8') as f:
-                vp_settings = json.load(f)
-                enabled = vp_settings.get("enabled", False)
-                threshold = vp_settings.get("threshold", 0.5)
-                engine.set_voiceprint_enabled(enabled)
-                # 更新声纹服务的阈值
-                if hasattr(engine, '_voiceprint_service') and engine._voiceprint_service:
-                    engine._voiceprint_service.threshold = threshold
-                logger.info(f"Loaded voiceprint settings: enabled={enabled}, threshold={threshold}")
+            old = json.loads(vp_file.read_text(encoding="utf-8"))
+            config.voiceprint_enabled = old.get("enabled", config.voiceprint_enabled)
+            config.voiceprint_threshold = old.get("threshold", config.voiceprint_threshold)
+            save_config(config)
+            vp_file.unlink()
+            logger.info("Migrated voiceprint_settings.json into config.json, removed old file")
         except Exception as e:
-            logger.warning(f"Failed to load voiceprint settings: {e}")
+            logger.warning(f"Voiceprint settings migration failed: {e}")
+
+    engine.set_voiceprint_enabled(config.voiceprint_enabled)
+    if config.voiceprint_enabled and getattr(engine, "_voiceprint_service", None):
+        engine._voiceprint_service.threshold = config.voiceprint_threshold
+    logger.info(f"Voiceprint: enabled={config.voiceprint_enabled}, threshold={config.voiceprint_threshold}")
 
     logger.info("VoiceType service ready")
     if config.asr_provider == "sherpa":
@@ -275,6 +297,8 @@ def create_app() -> FastAPI:
     app.include_router(rule_router)
     app.include_router(scene_router)
     app.include_router(voiceprint_router)
+    app.include_router(stats_router)
+    app.include_router(edit_router)
 
     # Mount static files
     ui_dist = Path(__file__).parent.parent / "src-ui" / "dist"
@@ -288,6 +312,10 @@ def create_app() -> FastAPI:
         @app.get("/floating.html")
         async def serve_floating():
             return FileResponse(str(ui_dist / "floating.html"))
+
+        @app.get("/edit-menu.html")
+        async def serve_edit_menu():
+            return FileResponse(str(ui_dist / "edit-menu.html"))
 
     return app
 

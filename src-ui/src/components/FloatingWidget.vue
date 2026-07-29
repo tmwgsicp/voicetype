@@ -1,28 +1,31 @@
 <!--
   Copyright (C) 2026 VoiceType Contributors
   Licensed under AGPL-3.0
+
+  简洁悬浮窗：固定大小、始终可见的胶囊条。
+  左侧音量条（真实音量驱动），右侧显示状态 / 实时识别文字。
+  不使用 canvas、不动态改窗口大小，尽量少出错。
 -->
 <template>
-  <div
-    class="floating-container"
-    @mousedown.left="onMouseDown"
-    @contextmenu.prevent
-    @mouseenter="showTooltip = true"
-    @mouseleave="showTooltip = false"
-  >
-    <canvas ref="canvasRef" :width="canvasW" :height="canvasH"></canvas>
-    
-    <!-- 工具提示 -->
-    <div v-if="showTooltip" class="tooltip" :class="tooltipClass">
-      <div class="tooltip-title">{{ tooltipTitle }}</div>
-      <div class="tooltip-hint">{{ tooltipHint }}</div>
+  <div class="fw-root" @contextmenu.prevent="onRightClick" @click="showMenu = false">
+    <div
+      class="capsule"
+      :class="state"
+      @mousedown.left="onMouseDown"
+    >
+      <div class="bars">
+        <span v-for="(h, i) in barHeights" :key="i" class="bar" :style="{ height: h + '%' }"></span>
+      </div>
+      <div class="label">
+        <span class="label-text">{{ displayText }}</span>
+      </div>
     </div>
-    
-    <div v-if="showMenu" class="context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
+
+    <div v-if="showMenu" class="menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
       <div class="menu-status">{{ stateLabel }}</div>
       <div class="menu-sep"></div>
-      <div class="menu-item" @click="openSettings">Settings</div>
-      <div class="menu-item" @click="quitApp">Quit</div>
+      <div class="menu-item" @click="openSettings">设置</div>
+      <div class="menu-item" @click="quitApp">退出</div>
     </div>
   </div>
 </template>
@@ -33,255 +36,185 @@ import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
-const BAR_COUNT = 15
-const BAR_WIDTH = 6
-const BAR_GAP = 4
-const BAR_MAX_H = 40
-const BAR_MIN_H = 8
-const PADDING_X = 12
-const PADDING_Y = 6
-const CORNER_RADIUS = 12
+type State = 'loading' | 'standby' | 'recording' | 'processing'
 
-const canvasW = PADDING_X * 2 + BAR_COUNT * BAR_WIDTH + (BAR_COUNT - 1) * BAR_GAP
-const canvasH = PADDING_Y * 2 + BAR_MAX_H
-
-const COLORS: Record<string, { bars: string[]; bg: string; glow?: string }> = {
-  standby: {
-    bars: [
-      '#13c2c2','#36cfc9','#5cdbd3','#87e8de','#b5f5ec','#d6f7f5','#e6fffb','#d6f7f5',
-      '#b5f5ec','#87e8de','#5cdbd3','#36cfc9','#13c2c2','#08979c','#006d75'
-    ],
-    bg: 'rgba(17, 33, 33, 0.92)',
-    glow: '#13c2c2',
-  },
-  recording: {
-    bars: [
-      '#cf1322','#ff4d4f','#ff7a45','#ffa940','#ffc53d','#ffec3d','#fff566','#ffec3d',
-      '#ffc53d','#ffa940','#ff7a45','#ff4d4f','#cf1322','#a8071a','#820014'
-    ],
-    bg: 'rgba(42, 18, 21, 0.92)',
-    glow: '#ff4d4f',
-  },
-  loading: {
-    bars: [
-      '#096dd9','#1890ff','#40a9ff','#69c0ff','#91d5ff','#bae7ff','#e6f7ff','#bae7ff',
-      '#91d5ff','#69c0ff','#40a9ff','#1890ff','#096dd9','#0050b3','#003a8c'
-    ],
-    bg: 'rgba(17, 29, 44, 0.92)',
-    glow: '#1890ff',
-  },
-}
-
-const canvasRef = ref<HTMLCanvasElement>()
-const state = ref<'loading' | 'standby' | 'recording'>('loading')
-const isAsrConnected = ref(false)  // ASR连接状态
-const stateLabel = computed(() => {
-  if (state.value === 'loading') {
-    return isAsrConnected.value ? 'Standby' : 'Initializing ASR...'
-  }
-  return { standby: 'Standby', recording: 'Recording...' }[state.value] || 'Unknown'
-})
+// 悬浮窗是在后端就绪后才显示的，会错过一次性的 ready 事件，因此默认就用待机态，
+// 避免卡在"加载中"。真正开始录音时由事件切到 recording。
+const state = ref<State>('standby')
+const isAsrConnected = ref(true)
+const captionText = ref('')
+let captionClearTimer: number | null = null
 
 const showMenu = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
 
-const showTooltip = ref(false)
-const tooltipClass = computed(() => state.value)
-const tooltipTitle = computed(() => {
-  if (state.value === 'loading') {
-    return isAsrConnected.value ? '准备就绪' : '正在初始化...'
-  }
-  if (state.value === 'recording') {
-    return '正在录音'
-  }
-  return '待机中'
-})
-const tooltipHint = computed(() => {
-  if (state.value === 'loading') {
-    return isAsrConnected.value ? '点击开始录音' : '请稍候,正在加载 ASR 模型'
-  }
-  if (state.value === 'recording') {
-    return '再次点击或按 F9 停止'
-  }
-  return '点击开始录音 或 按 F9'
-})
+// 真实音量（后端广播 audio_level）
+let audioLevel = 0
+let audioLevelSmoothed = 0
+let pollTimer: number | null = null
 
-let animId = 0
+const BAR_COUNT = 5
+const barHeights = ref<number[]>(Array(BAR_COUNT).fill(20))
+const barWeight = [0.6, 0.85, 1, 0.85, 0.6]
 let tick = 0
-const barHeights = Array(BAR_COUNT).fill(BAR_MIN_H)
-const barTargets = Array(BAR_COUNT).fill(BAR_MIN_H)
-const barPhases = Array.from({ length: BAR_COUNT }, () => Math.random() * Math.PI * 2)
-const barSpeeds = Array.from({ length: BAR_COUNT }, () => 0.08 + Math.random() * 0.1)
+let rafId = 0
 
-let isDragging = false
-let dragStartX = 0
-let dragStartY = 0
+const stateLabel = computed(() => ({
+  loading: isAsrConnected.value ? '待机' : '正在初始化…',
+  standby: '待机',
+  recording: '正在录音…',
+  processing: '转写中…',
+}[state.value] || ''))
+
+const displayText = computed(() => {
+  if (state.value === 'recording') return captionText.value || '正在聆听…'
+  if (state.value === 'processing') return captionText.value || '转写中…'
+  if (state.value === 'loading') return isAsrConnected.value ? '待机' : '加载中…'
+  return '待机 · F9'
+})
 
 function animate() {
-  const canvas = canvasRef.value
-  if (!canvas) return
-  const ctx = canvas.getContext('2d')!
-
+  audioLevelSmoothed += (audioLevel - audioLevelSmoothed) * 0.35
+  audioLevel *= 0.9
   tick++
-  const scheme = COLORS[state.value] || COLORS.loading
-
-  // Update targets with subtle animation
+  const next = new Array(BAR_COUNT)
   for (let i = 0; i < BAR_COUNT; i++) {
+    let target: number
     if (state.value === 'recording') {
-      // 录音模式：动态动画
-      barPhases[i] += barSpeeds[i] * 1.5
-      const base = 0.6 + 0.4 * Math.sin(barPhases[i])
-      const jitter = (Math.random() - 0.5) * 0.4
-      const spike = Math.random() < 0.12 ? 0.3 : 0
-      barTargets[i] = BAR_MIN_H + (BAR_MAX_H - BAR_MIN_H) * Math.max(0.15, Math.min(1, base + jitter + spike))
+      // 录音时始终有基础起伏（明确"在录音"），再叠加真实音量
+      const base = 22 + 16 * Math.sin(tick * 0.32 + i * 1.1)
+      const vol = audioLevelSmoothed * 120 * barWeight[i]
+      target = Math.min(100, Math.max(14, base + vol))
+    } else if (state.value === 'processing') {
+      target = 30 + 40 * (0.5 + 0.5 * Math.sin(tick * 0.2 + i * 0.7))
     } else if (state.value === 'loading') {
-      // 加载模式：明显的流动动画（提示正在初始化ASR）
-      barTargets[i] = BAR_MIN_H + (BAR_MAX_H - BAR_MIN_H) * (0.25 + 0.25 * Math.sin(tick * 0.1 + i * 0.5))
+      target = 25 + 30 * (0.5 + 0.5 * Math.sin(tick * 0.12 + i * 0.6))
     } else {
-      // 待机模式：静态 + 极轻微呼吸（几乎不动）
-      barTargets[i] = BAR_MIN_H + (BAR_MAX_H - BAR_MIN_H) * (0.12 + 0.03 * Math.sin(tick * 0.02 + i * 0.4))
+      target = 18 + 6 * Math.sin(tick * 0.05 + i * 0.5)
     }
+    const cur = barHeights.value[i]
+    next[i] = cur + (target - cur) * 0.45
   }
-
-  const lerp = state.value === 'recording' ? 0.45 : 0.15
-  for (let i = 0; i < BAR_COUNT; i++) {
-    barHeights[i] += (barTargets[i] - barHeights[i]) * lerp
-  }
-
-  // Draw bg with subtle glow
-  ctx.clearRect(0, 0, canvasW, canvasH)
-  
-  // Outer glow (only when recording)
-  if (scheme.glow && state.value === 'recording') {
-    ctx.shadowColor = scheme.glow
-    ctx.shadowBlur = 6
-  }
-  
-  ctx.beginPath()
-  ctx.roundRect(0, 0, canvasW, canvasH, CORNER_RADIUS)
-  ctx.fillStyle = scheme.bg
-  ctx.fill()
-  ctx.shadowBlur = 0
-
-  // Draw bars
-  for (let i = 0; i < BAR_COUNT; i++) {
-    const h = Math.max(BAR_MIN_H, barHeights[i])
-    const x = PADDING_X + i * (BAR_WIDTH + BAR_GAP)
-    const yTop = PADDING_Y + (BAR_MAX_H - h)
-    
-    ctx.fillStyle = scheme.bars[i]
-    ctx.beginPath()
-    ctx.roundRect(x, yTop, BAR_WIDTH, h, 2.5)
-    ctx.fill()
-  }
-
-  animId = requestAnimationFrame(animate)
+  barHeights.value = next
+  rafId = requestAnimationFrame(animate)
 }
 
 function onMouseDown(e: MouseEvent) {
   showMenu.value = false
-  isDragging = false
-  dragStartX = e.screenX
-  dragStartY = e.screenY
-
-  const currentWindow = getCurrentWindow()
-
+  let dragging = false
+  const sx = e.screenX, sy = e.screenY
+  const win = getCurrentWindow()
   const onMove = (ev: MouseEvent) => {
-    const dx = Math.abs(ev.screenX - dragStartX)
-    const dy = Math.abs(ev.screenY - dragStartY)
-    
-    // 移动超过5px才触发拖动，避免误触
-    if ((dx > 5 || dy > 5) && !isDragging) {
-      isDragging = true
-      currentWindow.startDragging().catch(() => {})
+    if (!dragging && (Math.abs(ev.screenX - sx) > 5 || Math.abs(ev.screenY - sy) > 5)) {
+      dragging = true
+      win.startDragging().catch(() => {})
     }
   }
-
   const onUp = () => {
     window.removeEventListener('mousemove', onMove)
     window.removeEventListener('mouseup', onUp)
-    if (!isDragging) {
-      onToggle()
-    }
+    if (!dragging) onToggle()
   }
-
   window.addEventListener('mousemove', onMove)
   window.addEventListener('mouseup', onUp)
 }
 
 function onRightClick(e: MouseEvent) {
-  menuX.value = e.offsetX
-  menuY.value = e.offsetY
+  menuX.value = Math.min(e.offsetX, 200)
+  menuY.value = Math.max(0, e.offsetY - 60)
   showMenu.value = true
 }
 
 async function onToggle() {
   try { await invoke('toggle_recording') } catch {}
 }
-
 function openSettings() {
   showMenu.value = false
-  const appWindow = getCurrentWindow()
-  // Emit event to main window to show settings
-  invoke('get_port').then(() => {
-    window.open('/', '_blank')
-  }).catch(() => {})
+  invoke('show_main_window').catch(() => { window.open('/', '_blank') })
 }
-
 function quitApp() {
   showMenu.value = false
-  import('@tauri-apps/plugin-process').then(mod => mod.exit(0)).catch(() => {})
+  import('@tauri-apps/plugin-process').then(m => m.exit(0)).catch(() => {})
+}
+
+function setCaption(text: string) {
+  const t = (text || '').trim()
+  if (!t) return
+  captionText.value = t
+  if (captionClearTimer) { clearTimeout(captionClearTimer); captionClearTimer = null }
+}
+function scheduleCaptionClear(delay = 2500) {
+  if (captionClearTimer) clearTimeout(captionClearTimer)
+  captionClearTimer = window.setTimeout(() => { captionText.value = '' }, delay)
 }
 
 onMounted(async () => {
-  animId = requestAnimationFrame(animate)
+  rafId = requestAnimationFrame(animate)
 
   await listen<any>('backend-event', (event) => {
-    const data = event.payload
-    if (data.type === 'recording') {
-      // 只有在ASR已连接时才允许进入standby/recording
-      if (data.active) {
-        state.value = 'recording'
-      } else if (isAsrConnected.value) {
-        state.value = 'standby'
-      } else {
-        state.value = 'loading'  // 如果ASR未连接，保持loading
-      }
-    }
-    if (data.type === 'asr_connected') {
-      isAsrConnected.value = data.connected
-      // ASR连接后，如果不在录音，则进入standby
-      if (data.connected && state.value === 'loading') {
-        state.value = 'standby'
-      }
-      // ASR断开后，强制进入loading
-      if (!data.connected) {
-        state.value = 'loading'
-      }
-    }
-    // 声纹验证被拒绝
-    if (data.type === 'voiceprint_reject') {
-      console.log('🚫 Voiceprint rejected:', data)
-      // TODO: 显示视觉反馈（闪烁或通知）
+    const data = event.payload || {}
+    switch (data.type) {
+      case 'recording':
+        if (data.active) {
+          state.value = 'recording'
+          captionText.value = ''
+          if (captionClearTimer) { clearTimeout(captionClearTimer); captionClearTimer = null }
+        } else {
+          // 停止后回待机（可能先短暂"转写中"）。绝不回到"加载中"——那只是初始态。
+          state.value = captionText.value ? 'processing' : 'standby'
+          if (state.value === 'processing') {
+            setTimeout(() => {
+              if (state.value === 'processing') state.value = 'standby'
+              scheduleCaptionClear(500)
+            }, 1200)
+          }
+        }
+        break
+      case 'asr_connected':
+        // 仅记录状态。录音结束后 ASR 会正常断开，不能据此回到"加载中"。
+        isAsrConnected.value = data.connected
+        break
+      case 'audio_level':
+        audioLevel = Math.max(audioLevel, data.level || 0)
+        break
+      case 'asr_partial':
+      case 'raw_text':
+        if (data.text) { setCaption(data.text); if (state.value !== 'recording') state.value = 'recording' }
+        break
+      case 'final_complete':
+        if (data.text) { setCaption(data.text); scheduleCaptionClear(2500) }
+        break
     }
   })
 
   await listen<any>('backend-status', (event) => {
-    const data = event.payload
-    if (data && data.ready) {
-      // 后端就绪，但ASR可能尚未连接，保持loading直到收到asr_connected事件
-      if (state.value === 'loading' && isAsrConnected.value) {
-        state.value = 'standby'
-      }
-    }
+    const d = event.payload
+    if (d && d.ready && state.value === 'loading') state.value = 'standby'
   })
 
-  window.addEventListener('click', () => { showMenu.value = false })
+  // 兜底轮询：即使 Tauri 事件丢失，也能保证录音状态正确切换（波形/颜色随之变化）
+  try {
+    const port = await invoke<number>('get_port')
+    const base = `http://127.0.0.1:${port}`
+    pollTimer = window.setInterval(async () => {
+      try {
+        const s = await (await fetch(`${base}/api/status`)).json()
+        if (s.is_recording && state.value !== 'recording') {
+          state.value = 'recording'
+        } else if (!s.is_recording && state.value === 'recording') {
+          state.value = 'standby'
+          scheduleCaptionClear(600)
+        }
+      } catch {}
+    }, 500)
+  } catch {}
 })
 
 onUnmounted(() => {
-  cancelAnimationFrame(animId)
+  cancelAnimationFrame(rafId)
+  if (captionClearTimer) clearTimeout(captionClearTimer)
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 
@@ -290,87 +223,53 @@ html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
 </style>
 
 <style scoped>
-.floating-container {
-  width: v-bind(canvasW + 'px');
-  height: v-bind(canvasH + 'px');
-  cursor: pointer;
+.fw-root {
+  width: 100vw; height: 100vh;
+  display: flex; align-items: center; justify-content: center;
   user-select: none;
-  position: relative;
 }
 
-canvas { display: block; }
+.capsule {
+  display: flex; align-items: center; gap: 10px;
+  width: calc(100vw - 12px); height: 42px;
+  padding: 0 14px; box-sizing: border-box;
+  background: #1f2229;
+  border: none;
+  border-radius: 21px;
+  box-shadow: none;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+/* 录音/转写时才加彩色辉光作为状态反馈；待机时完全无阴影、边缘纯透明 */
+.capsule.recording { box-shadow: 0 0 14px rgba(255, 77, 79, 0.5); }
+.capsule.processing { box-shadow: 0 0 14px rgba(146, 84, 222, 0.45); }
 
-.context-menu {
+.bars { display: flex; align-items: center; gap: 3px; height: 22px; flex-shrink: 0; }
+.bar {
+  width: 3px; min-height: 3px; border-radius: 2px;
+  background: #8c8c8c; align-self: center;
+  transition: height 0.08s linear;
+}
+.capsule.recording .bar { background: linear-gradient(180deg, #ff7875, #ff4d4f); }
+.capsule.processing .bar { background: linear-gradient(180deg, #b37feb, #9254de); }
+.capsule.standby .bar { background: linear-gradient(180deg, #5cdbd3, #13c2c2); }
+.capsule.loading .bar { background: linear-gradient(180deg, #69c0ff, #1890ff); }
+
+.label {
+  flex: 1; min-width: 0; overflow: hidden;
+  display: flex; justify-content: flex-end;
+}
+.label-text {
+  white-space: nowrap; color: #f0f0f0; font-size: 13px;
+  font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+.menu {
   position: absolute; background: #262626; border-radius: 8px;
-  padding: 4px 0; min-width: 120px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  padding: 4px 0; min-width: 110px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.35);
 }
 .menu-status { padding: 6px 12px; font-size: 12px; color: #8c8c8c; }
 .menu-sep { height: 1px; background: #3a3a3a; margin: 2px 0; }
-.menu-item {
-  padding: 6px 12px; font-size: 13px; color: #e8e8e8; cursor: pointer;
-  transition: background 150ms;
-}
+.menu-item { padding: 6px 12px; font-size: 13px; color: #e8e8e8; cursor: pointer; }
 .menu-item:hover { background: #3a3a3a; }
-
-/* 工具提示 */
-.tooltip {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-8px);
-  background: rgba(38, 38, 38, 0.95);
-  border-radius: 8px;
-  padding: 8px 12px;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: tooltipFadeIn 0.2s ease-out;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-
-@keyframes tooltipFadeIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(-8px);
-  }
-}
-
-.tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: rgba(38, 38, 38, 0.95);
-}
-
-.tooltip-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  margin-bottom: 2px;
-}
-
-.tooltip-hint {
-  font-size: 11px;
-  color: #bfbfbf;
-}
-
-.tooltip.recording .tooltip-title {
-  color: #ff4d4f;
-}
-
-.tooltip.loading .tooltip-title {
-  color: #1890ff;
-}
-
-.tooltip.standby .tooltip-title {
-  color: #13c2c2;
-}
-
 </style>

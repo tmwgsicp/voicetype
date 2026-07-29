@@ -48,17 +48,30 @@ export function useApi() {
     if (!baseUrl.value) {
       throw new Error('后端服务未就绪，请稍后重试')
     }
-    
+
     const url = `${baseUrl.value}${path}`
-    console.log(`API request: ${options?.method || 'GET'} ${url}`)
-    
-    const resp = await fetch(url, options)
-    if (!resp.ok) {
-      const error = await resp.json().catch(() => ({ detail: 'Request failed' }))
-      console.error(`API error: ${resp.status}`, error)
-      throw error
+
+    // 后端启动 + 模型预热需要几秒。连接失败（后端还没起来）时退避重试，
+    // 避免各组件在启动瞬间弹一堆"加载失败"误报。HTTP 错误（4xx/5xx）是真错，不重试。
+    let lastErr: any
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try {
+        const resp = await fetch(url, options)
+        if (!resp.ok) {
+          const error = await resp.json().catch(() => ({ detail: 'Request failed' }))
+          error.__httpStatus = resp.status
+          throw error
+        }
+        return await resp.json()
+      } catch (e: any) {
+        // 已到达后端并返回错误（有 detail/状态码）→ 真错，直接抛
+        if (e && (e.__httpStatus !== undefined || e.detail !== undefined)) throw e
+        // 连接失败（后端未就绪）→ 退避重试
+        lastErr = e
+        await new Promise(r => setTimeout(r, 500))
+      }
     }
-    return resp.json()
+    throw lastErr || new Error('后端服务未就绪')
   }
 
   async function get<T = any>(path: string): Promise<T> {
@@ -111,35 +124,29 @@ export function useApi() {
     return fetchJson('/api/toggle', { method: 'POST' })
   }
 
-  async function getKBStats() {
-    return fetchJson('/api/kb/stats')
+  async function getStatsSummary() {
+    return fetchJson('/api/stats/summary')
   }
 
-  async function getKBDocuments() {
-    return fetchJson('/api/kb/documents')
+  async function getStatsDaily(days = 30) {
+    return fetchJson(`/api/stats/daily?days=${days}`)
   }
 
-  async function addKBText(title: string, content: string) {
-    return fetchJson('/api/kb/text', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, content }),
-    })
+  async function getStatsScenes() {
+    return fetchJson('/api/stats/scenes')
   }
 
-  async function uploadKBFile(file: File) {
-    if (!baseUrl.value) await initApi()
-    const fd = new FormData()
-    fd.append('file', file)
-    const resp = await fetch(`${baseUrl.value}/api/kb/upload`, {
-      method: 'POST',
-      body: fd,
-    })
-    return resp.json()
+  async function getHistory(limit = 50, offset = 0, q = '') {
+    const qs = new URLSearchParams({ limit: String(limit), offset: String(offset), q })
+    return fetchJson(`/api/stats/history?${qs.toString()}`)
   }
 
-  async function deleteKBDocument(id: string) {
-    return fetchJson(`/api/kb/documents/${id}`, { method: 'DELETE' })
+  async function deleteHistoryItem(id: number) {
+    return fetchJson(`/api/stats/history/${id}`, { method: 'DELETE' })
+  }
+
+  async function clearHistory() {
+    return fetchJson('/api/stats/history/clear', { method: 'POST' })
   }
 
   return {
@@ -153,11 +160,12 @@ export function useApi() {
     getConfig,
     saveConfig,
     testConnection,
+    getStatsSummary,
+    getStatsDaily,
+    getStatsScenes,
+    getHistory,
+    deleteHistoryItem,
+    clearHistory,
     toggleRecording,
-    getKBStats,
-    getKBDocuments,
-    addKBText,
-    uploadKBFile,
-    deleteKBDocument,
   }
 }

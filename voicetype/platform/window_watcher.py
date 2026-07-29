@@ -67,11 +67,34 @@ def _get_window_info_darwin() -> WindowInfo:
     if not active_app:
         return WindowInfo()
 
+    app_name = active_app.localizedName() or ""
+    pid = active_app.processIdentifier()
+
+    # NSWorkspace 只给应用名，拿不到窗口标题。用 Quartz 取前台窗口标题，
+    # 这样浏览器里的网页应用（Gmail / 文档等）也能被场景规则按标题匹配。
+    # 需要「屏幕录制」权限；拿不到就回退到应用名，不影响基本功能。
+    window_title = app_name
+    try:
+        from Quartz import (
+            CGWindowListCopyWindowInfo,
+            kCGWindowListOptionOnScreenOnly,
+            kCGNullWindowID,
+        )
+        wins = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID) or []
+        for w in wins:
+            if w.get("kCGWindowOwnerPID") == pid:
+                name = w.get("kCGWindowName")
+                if name:
+                    window_title = name
+                    break
+    except Exception:
+        pass
+
     return WindowInfo(
-        app_name=active_app.localizedName() or "",
-        window_title=active_app.localizedName() or "",
+        app_name=app_name,
+        window_title=window_title,
         process_path=active_app.bundleURL().path() if active_app.bundleURL() else "",
-        pid=active_app.processIdentifier(),
+        pid=pid,
     )
 
 
