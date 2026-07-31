@@ -66,19 +66,10 @@ function onToggle() {
 .status-label { font-weight: var(--font-semibold); }
 .text-truncate { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.btn {
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--border-base); border-radius: var(--radius-base);
-  background: var(--bg-primary); cursor: pointer; font-size: var(--font-sm);
-  transition: all var(--duration-fast) var(--ease-in-out); white-space: nowrap;
-}
-.btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
-.btn-primary { background: var(--primary-color); color: white; border-color: var(--primary-color); }
-.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: white; }
-.btn-record { display: inline-flex; align-items: center; gap: var(--space-sm); font-weight: var(--font-semibold); flex-shrink: 0; }
-.btn-record.recording { background: var(--error-color); border-color: var(--error-color); }
-.btn-record.recording:hover { background: #ff7875; border-color: #ff7875; }
-.btn-icon { flex-shrink: 0; }
+/* 通用按钮走全局 design-system；这里只留组件特有的录音按钮 */
+.btn-record { font-weight: var(--font-semibold); flex-shrink: 0; }
+.btn-record.recording { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-record.recording:hover { background: #e0342b; border-color: #e0342b; }
 
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 </style>

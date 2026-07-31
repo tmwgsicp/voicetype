@@ -133,6 +133,17 @@ jobs:
           files: src-tauri/target/release/bundle/nsis/*.exe
           draft: false
           prerelease: false
+          body: |
+            ## VoiceType ${{ github.ref_name }}
+
+            ### 新增 / 改进
+            - 文本编辑动作菜单：选中文字按 **F8**，弹预设动作（翻译 / 润色 / 精简 / 正式 / 要点）就地改写替换
+            - 预设动作可在「设置 → 文本动作」自由增删改（名称 / 说明 / 提示词）
+            - 全面统一按钮与界面风格（苹果风）
+            - 删除操作统一为二次确认
+
+            ### 平台说明
+            - ⚠️ **F8 文本编辑目前为 Windows 完整支持**；**macOS 上为实验性**：因焦点/选区机制不同，替换可能变为插入（后续版本将用原生实现修复）。其余功能（听写、场景、术语规则、声纹、统计、历史）macOS 正常可用。
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   

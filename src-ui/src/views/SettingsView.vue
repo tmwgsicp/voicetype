@@ -29,6 +29,9 @@
         <button :class="['nav-item', { active: activeTab === 'rules' }]" @click="activeTab = 'rules'">
           <NavIcon name="rules" /><span>术语规则</span>
         </button>
+        <button :class="['nav-item', { active: activeTab === 'actions' }]" @click="activeTab = 'actions'">
+          <NavIcon name="sparkle" /><span>文本动作</span>
+        </button>
         <button :class="['nav-item', { active: activeTab === 'voiceprint' }]" @click="activeTab = 'voiceprint'">
           <NavIcon name="voiceprint" /><span>声纹</span>
         </button>
@@ -216,6 +219,12 @@
         <RuleManager />
       </div>
 
+      <!-- Text Actions Tab -->
+      <div v-if="activeTab === 'actions'" class="tab-content">
+        <h1 class="page-title">文本动作</h1>
+        <TextActionManager />
+      </div>
+
       <!-- Scenes Tab -->
       <div v-if="activeTab === 'scenes'" class="tab-content">
         <h1 class="page-title">场景</h1>
@@ -296,6 +305,7 @@ import { useApi } from '../composables/useApi'
 import { useWebSocket } from '../composables/useWebSocket'
 import StatusBar from '../components/StatusBar.vue'
 import RuleManager from '../components/RuleManager.vue'
+import TextActionManager from '../components/TextActionManager.vue'
 import SceneManager from '../components/SceneManager.vue'
 import VoiceprintManager from '../components/VoiceprintManager.vue'
 import StatsView from './StatsView.vue'
@@ -775,21 +785,7 @@ onMounted(async () => {
   align-items: center;
 }
 
-.btn {
-  padding: var(--space-sm) var(--space-lg);
-  border: 1px solid var(--border-base);
-  border-radius: var(--radius-small);
-  background: white;
-  cursor: pointer;
-  font-size: var(--font-sm);
-  transition: all 0.2s;
-}
-
-.btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
-.btn-primary { background: var(--primary-color); color: white; border-color: var(--primary-color); }
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-sm { padding: var(--space-xs) 10px; font-size: var(--font-xs); }
-
+/* .btn / .btn-primary / .btn-sm 走全局 design-system 统一样式 */
 .save-status { font-size: var(--font-xs); margin-left: var(--space-sm); }
 .save-status.success { color: var(--success-color); }
 .save-status.warning { color: var(--warning-color); }

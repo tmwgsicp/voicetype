@@ -80,6 +80,7 @@ class VoiceTypingEngine:
         typing_delay_ms: int = 5,
         auto_scene_enabled: bool = True,
         edit_hotkey: str = "<f10>",
+        text_actions: list = None,
     ):
         """
         Initialize VoiceTypingEngine.
@@ -178,10 +179,11 @@ class VoiceTypingEngine:
         self._edit_selection = ""       # 当前待改写的选区原文
         self._edit_target_hwnd = 0      # 弹菜单前的目标程序窗口，套用时切回去
         self._edit_menu_open = False    # 菜单是否正显示
-        self._edit_key_listener = None  # 菜单打开期间的全局按键捕获（1-5/Esc）
-        self._edit_key_map = {}         # 数字键 -> action_id
-        self._edit_cancel_timer = None  # 安全兜底：超时自动取消
-        self._loop = None               # 事件循环引用（供 pynput 线程回调）
+        self._edit_timeout_handle = None  # 安全兜底：超时自动收起菜单
+        self._loop = None               # 事件循环引用
+        # 当前生效的预设动作列表（来自 config，可热更新）
+        from .pipeline.text_actions import normalize_actions
+        self._text_actions = normalize_actions(text_actions)
         # 每次按下都触发 _start_edit（单次触发，非 toggle）：is_active_fn 恒 False
         self.edit_hotkey_listener = HotkeyListener(
             hotkey=edit_hotkey,
@@ -1026,10 +1028,8 @@ class VoiceTypingEngine:
         self._edit_target_hwnd = hwnd
         self._edit_menu_open = True
         pos = await self.keyboard_output.get_cursor_pos()
-        from .pipeline.text_actions import actions_for_menu
-        menu = actions_for_menu()
-        # 数字键 -> action_id（菜单窗是非激活窗口，键盘由后端全局捕获）
-        self._edit_key_map = {a["key"]: a["id"] for a in menu}
+        from .pipeline.text_actions import menu_view
+        menu = menu_view(self._text_actions)
         logger.info("Edit menu: selection %d chars, hwnd=%s, cursor=%s", len(selection), hwnd, pos)
         await self._broadcast({
             "type": "edit_menu_show",
@@ -1038,12 +1038,12 @@ class VoiceTypingEngine:
             "preview": selection[:80],
             "actions": menu,
         })
-        self._start_menu_key_capture()
+        self._arm_edit_timeout()
 
     async def apply_edit_action(self, action_id: str):
         """用户在菜单里选了某个预设动作：LLM 按该动作固定 prompt 改写选区，切回目标程序并替换。"""
-        from .pipeline.text_actions import action_prompt, get_action
-        self._stop_menu_key_capture()   # 先解除键盘捕获，LLM 处理期间不影响用户打字
+        from .pipeline.text_actions import prompt_for
+        self._cancel_edit_timeout()
         selection = self._edit_selection
         hwnd = self._edit_target_hwnd
         # 立即收起菜单并清状态（避免重复触发）
@@ -1055,11 +1055,11 @@ class VoiceTypingEngine:
         if not selection:
             logger.info("Edit apply: no pending selection")
             return
-        prompt = action_prompt(action_id)
+        prompt = prompt_for(self._text_actions, action_id)
         if not prompt:
             logger.warning("Edit apply: unknown action '%s'", action_id)
             return
-        action = get_action(action_id)
+        action = next((a for a in self._text_actions if a["id"] == action_id), None)
         try:
             result = await self.pipeline.apply_text_action(selection, prompt)
             if not result or not result.strip():
@@ -1083,73 +1083,42 @@ class VoiceTypingEngine:
             logger.error("Edit apply failed: %s", e)
 
     async def cancel_edit(self):
-        """用户取消（按 Esc / 点空白）：收起菜单，丢弃选区状态。"""
-        self._stop_menu_key_capture()
+        """用户取消（点取消 / 超时）：收起菜单，丢弃选区状态。"""
+        self._cancel_edit_timeout()
         self._edit_selection = ""
         self._edit_target_hwnd = 0
         self._edit_menu_open = False
         await self._broadcast({"type": "edit_menu_hide"})
         logger.info("Edit menu: cancelled")
 
-    def _start_menu_key_capture(self):
-        """菜单打开期间，全局捕获 1-5 / Esc（因为菜单窗不抢焦点，按键会落到目标程序）。
-
-        suppress=True 会在菜单显示的短暂期间拦截所有按键——这是刻意的（modal 菜单），
-        选中/取消/超时后立即解除。鼠标点击不受影响，走 API 分支。
-        """
-        self._stop_menu_key_capture()
-        try:
-            from pynput import keyboard as kb
-        except Exception as e:
-            logger.warning("pynput unavailable for menu key capture: %s", e)
-            return
-
-        def on_press(key):
-            try:
-                if key == kb.Key.esc:
-                    self._dispatch(self.cancel_edit())
-                    return
-                ch = getattr(key, "char", None)
-                if ch and ch in self._edit_key_map:
-                    action_id = self._edit_key_map[ch]
-                    self._dispatch(self.apply_edit_action(action_id))
-            except Exception as ex:
-                logger.error("menu key handler error: %s", ex)
-
-        try:
-            self._edit_key_listener = kb.Listener(on_press=on_press, suppress=True)
-            self._edit_key_listener.start()
-        except Exception as e:
-            logger.warning("Failed to start menu key capture: %s", e)
-            self._edit_key_listener = None
-
-        # 安全兜底：10s 内没选择就自动取消，避免键盘一直被拦截
+    def _arm_edit_timeout(self):
+        """安全兜底：菜单弹出后 12s 内没操作就自动收起（避免菜单一直悬在屏幕上）。"""
+        self._cancel_edit_timeout()
         if self._loop:
-            self._edit_cancel_timer = self._loop.call_later(
-                10.0, lambda: self._dispatch(self.cancel_edit()) if self._edit_menu_open else None
+            self._edit_timeout_handle = self._loop.call_later(
+                12.0,
+                lambda: asyncio.ensure_future(self.cancel_edit()) if self._edit_menu_open else None,
             )
 
-    def _stop_menu_key_capture(self):
-        """解除菜单期间的键盘捕获 + 取消兜底定时器。"""
-        if self._edit_key_listener is not None:
+    def _cancel_edit_timeout(self):
+        """取消兜底定时器。"""
+        if self._edit_timeout_handle is not None:
             try:
-                self._edit_key_listener.stop()
+                self._edit_timeout_handle.cancel()
             except Exception:
                 pass
-            self._edit_key_listener = None
-        if self._edit_cancel_timer is not None:
-            try:
-                self._edit_cancel_timer.cancel()
-            except Exception:
-                pass
-            self._edit_cancel_timer = None
+            self._edit_timeout_handle = None
 
-    def _dispatch(self, coro):
-        """从任意线程把协程调度到事件循环执行。"""
-        if self._loop:
-            self._loop.call_soon_threadsafe(lambda: asyncio.ensure_future(coro))
-        else:
-            logger.warning("No loop to dispatch edit coroutine")
+    def reload_text_actions(self, actions: list):
+        """热更新预设动作列表（改配置即时生效，无需重启）。"""
+        from .pipeline.text_actions import normalize_actions
+        self._text_actions = normalize_actions(actions)
+        logger.info("Text actions reloaded: %d actions", len(self._text_actions))
+
+    def get_menu_actions(self) -> list:
+        """当前生效的预设动作（菜单视图，不含 prompt）。"""
+        from .pipeline.text_actions import menu_view
+        return menu_view(self._text_actions)
 
     async def _on_window_change(self, window: WindowInfo):
         # 手动选了场景、或用户关闭了"自动切换场景"，都不自动切

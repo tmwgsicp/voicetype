@@ -181,7 +181,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useApi } from '../composables/useApi'
 
 const api = useApi()
@@ -294,8 +294,12 @@ const toggleRule = async (rule: Rule) => {
 }
 
 const deleteRule = async (rule: Rule) => {
-  if (!confirm(`确定删除规则 "${rule.wrong} → ${rule.correct}"？`)) {
-    return
+  try {
+    await ElMessageBox.confirm(`确定删除规则「${rule.wrong} → ${rule.correct}」？`, '删除规则', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消',
+    })
+  } catch {
+    return  // 用户取消
   }
 
   try {
@@ -619,25 +623,6 @@ input:checked + .toggle-slider {
 
 input:checked + .toggle-slider:before {
   transform: translateX(20px);
-}
-
-.btn-icon {
-  padding: var(--space-xs);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-secondary);
-  border-radius: var(--radius-small);
-  transition: all var(--duration-fast) var(--ease-in-out);
-}
-
-.btn-icon:hover {
-  background: var(--bg-secondary);
-  color: var(--primary-color);
-}
-
-.btn-icon.btn-danger:hover {
-  color: var(--error-color);
 }
 
 .form-row {

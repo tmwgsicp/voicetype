@@ -152,6 +152,73 @@ input:focus, select:focus, textarea:focus {
 ::-webkit-scrollbar-thumb:hover { background: rgba(120, 120, 128, 0.55); background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 
+/* ---- 统一按钮系统（全局，各组件直接用这些 class，勿在 scoped 里重定义 .btn*） ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--separator-opaque);
+  border-radius: var(--radius-control);
+  background: var(--bg-card);
+  color: var(--label);
+  font-family: var(--font-system);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.btn:hover { background: var(--bg-fill); }
+.btn:active { background: var(--bg-fill-hover); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+/* 小号（导入/导出/切换等次级操作） */
+.btn-sm { padding: 4px 10px; font-size: var(--text-footnote); border-radius: var(--radius-small); }
+
+/* 主操作（蓝底白字） */
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-primary:active { background: var(--accent-hover); }
+
+/* 无边框文字按钮 */
+.btn-ghost { background: transparent; border-color: transparent; color: var(--accent); }
+.btn-ghost:hover { background: var(--accent-tint); }
+
+/* 危险操作：轮廓红（次级，如列表里的删除） */
+.btn-danger { color: var(--red); }
+.btn-danger:hover { background: rgba(255, 59, 48, 0.1); border-color: rgba(255, 59, 48, 0.3); }
+
+/* 危险操作：实心红（主级，如"停止录音"） */
+.btn-red { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-red:hover { background: #e0342b; border-color: #e0342b; }
+
+/* 方形图标按钮（可单独用 class="btn-icon"；.icon-btn 为兼容旧写法的同义别名） */
+.btn-icon, .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 1px solid var(--separator-opaque);
+  border-radius: var(--radius-control);
+  background: var(--bg-card);
+  color: var(--label-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.btn-icon:hover, .icon-btn:hover { background: var(--bg-fill); color: var(--label); }
+.btn-icon:disabled, .icon-btn:disabled { opacity: 0.4; cursor: default; }
+.btn-icon.btn-danger, .icon-btn.danger { color: var(--red); }
+.btn-icon.btn-danger:hover, .icon-btn.danger:hover {
+  background: rgba(255, 59, 48, 0.1); color: var(--red); border-color: rgba(255, 59, 48, 0.3);
+}
+
 /* ---- element-plus 覆盖，统一到本设计系统 ---- */
 .el-button {
   font-family: var(--font-system) !important; border-radius: var(--radius-control) !important;

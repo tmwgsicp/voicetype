@@ -4,7 +4,8 @@
 
   预设文本动作菜单（在光标处弹出的小卡片）。
   选中文字 → 编辑快捷键 → 后端广播 edit_menu_show → 本窗弹出 →
-  数字键 1-5 / 点击选动作 → 就地改写替换；Esc / 失焦取消。
+  鼠标点选动作 → 就地改写替换。菜单窗是非激活窗口（不抢焦点，保住目标选区），
+  故用鼠标点选/点「取消」；12s 无操作自动收起。
 -->
 <template>
   <div class="menu-card" @mousedown.prevent>
@@ -21,17 +22,14 @@
         @mouseenter="hovered = i"
         @click="pick(a.id)"
       >
-        <span class="kbd">{{ a.key }}</span>
+        <span class="dot"></span>
         <span class="labels">
           <span class="label">{{ a.label }}</span>
           <span class="hint">{{ a.hint }}</span>
         </span>
       </button>
     </div>
-    <div class="menu-foot">
-      <span><b>1–5</b> 选择</span>
-      <span><b>Esc</b> 取消</span>
-    </div>
+    <button class="menu-cancel" @click="cancel">取消</button>
   </div>
 </template>
 
@@ -78,8 +76,19 @@ async function pick(actionId: string) {
   busy = false
 }
 
-// 键盘（1-5 / Esc）由后端全局捕获——菜单窗是非激活窗口，不获得键盘焦点，
-// 这样目标程序的选区不会丢失，套用改写才能正确「替换」。此处只处理鼠标点击/悬停。
+async function cancel() {
+  if (busy) return
+  busy = true
+  await hideWindow()
+  try {
+    const b = await apiBase()
+    await fetch(`${b}/api/edit/cancel`, { method: 'POST' })
+  } catch {}
+  busy = false
+}
+
+// 菜单窗是非激活窗口，不获得键盘焦点（这样目标程序的选区不会丢失，套用才能正确「替换」）。
+// 因此这里只处理鼠标点击/悬停；取消用「取消」按钮，或后端 12s 兜底自动收起。
 
 onMounted(async () => {
   await listen<any>('backend-event', (event) => {
@@ -160,53 +169,46 @@ onUnmounted(() => {})
 .menu-item.active { background: #0a84ff; }
 .menu-item.active .label { color: #fff; }
 .menu-item.active .hint { color: rgba(255, 255, 255, 0.8); }
-.menu-item.active .kbd {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-  border-color: transparent;
-}
+.menu-item.active .dot { background: #fff; }
 
-.kbd {
+.dot {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(60, 60, 67, 0.6);
-  background: rgba(120, 120, 128, 0.12);
-  border: 0.5px solid rgba(0, 0, 0, 0.06);
-  border-radius: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(10, 132, 255, 0.55);
 }
 
 .labels { display: flex; flex-direction: column; line-height: 1.2; }
 .label { font-size: 13px; font-weight: 500; color: #1d1d1f; }
 .hint { font-size: 11px; color: rgba(60, 60, 67, 0.5); }
 
-.menu-foot {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 8px 2px;
+.menu-cancel {
   margin-top: 4px;
+  padding: 7px 8px;
+  border: none;
   border-top: 0.5px solid rgba(60, 60, 67, 0.1);
-  font-size: 10px;
-  color: rgba(60, 60, 67, 0.45);
+  background: transparent;
+  color: rgba(60, 60, 67, 0.55);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0 0 10px 10px;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.menu-foot b { font-weight: 600; color: rgba(60, 60, 67, 0.7); }
+.menu-cancel:hover { background: rgba(120, 120, 128, 0.1); color: rgba(60, 60, 67, 0.9); }
 
 @media (prefers-color-scheme: dark) {
   .menu-card {
     background: rgba(44, 44, 46, 0.9);
     border-color: rgba(255, 255, 255, 0.12);
   }
-  .menu-title, .menu-foot { color: rgba(235, 235, 245, 0.5); }
+  .menu-title { color: rgba(235, 235, 245, 0.5); }
   .menu-preview { color: rgba(235, 235, 245, 0.8); }
   .label { color: #f5f5f7; }
   .hint { color: rgba(235, 235, 245, 0.45); }
-  .kbd { background: rgba(120, 120, 128, 0.24); color: rgba(235, 235, 245, 0.7); border-color: transparent; }
-  .menu-head, .menu-foot { border-color: rgba(255, 255, 255, 0.1); }
-  .menu-foot b { color: rgba(235, 235, 245, 0.7); }
+  .menu-head { border-color: rgba(255, 255, 255, 0.1); }
+  .menu-cancel { color: rgba(235, 235, 245, 0.55); border-color: rgba(255, 255, 255, 0.1); }
+  .menu-cancel:hover { background: rgba(120, 120, 128, 0.2); color: rgba(235, 235, 245, 0.9); }
 }
 </style>

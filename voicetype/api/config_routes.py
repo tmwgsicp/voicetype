@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ..config import VoiceTypeConfig, save_config, mask_key, effective_asr_api_key
+from ..pipeline.text_actions import normalize_actions
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ class ConfigResponse(BaseModel):
     llm_temperature: float
     hotkey: str
     edit_hotkey: str
+    text_actions: list[dict]
     typing_delay_ms: int
     host: str
     port: int
@@ -75,6 +77,8 @@ async def get_config():
     data["asr_api_key"] = mask_key(_current_config.asr_api_key)
     data["asr_secret_key"] = mask_key(_current_config.asr_secret_key)
     data["llm_api_key"] = mask_key(_current_config.llm_api_key)
+    # 预设动作：返回规范化后的有效列表（空则内置默认），方便设置页直接编辑
+    data["text_actions"] = normalize_actions(_current_config.text_actions)
     
     # 确保 llm_base_url 总是有值（使用默认值）
     if not data.get("llm_base_url"):
@@ -96,6 +100,7 @@ class ConfigUpdate(BaseModel):
     llm_temperature: Optional[float] = None
     hotkey: Optional[str] = None
     edit_hotkey: Optional[str] = None
+    text_actions: Optional[list[dict]] = None
     typing_delay_ms: Optional[int] = None
     auto_start_asr: Optional[bool] = None
     auto_scene_enabled: Optional[bool] = None
@@ -153,6 +158,13 @@ async def update_config(update: ConfigUpdate):
             asyncio.create_task(_engine_instance.reload_edit_hotkey(_current_config.edit_hotkey))
         except Exception as e:
             logger.error("Failed to reload edit hotkey: %s", e)
+
+    # 热重载预设文本动作（增删改即时生效）
+    if "text_actions" in updates and _engine_instance:
+        try:
+            _engine_instance.reload_text_actions(_current_config.text_actions)
+        except Exception as e:
+            logger.error("Failed to reload text actions: %s", e)
 
     logger.info("Config updated: %s", list(updates.keys()))
     

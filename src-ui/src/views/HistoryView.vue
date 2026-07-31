@@ -12,12 +12,16 @@
         placeholder="搜索历史听写…"
         @input="onSearch"
       />
-      <button class="btn btn-clear" @click="onClear" :disabled="!items.length">清空历史</button>
+      <button class="btn btn-danger" @click="onClear" :disabled="!items.length">清空历史</button>
     </div>
 
     <div v-if="loading" class="hint">加载中…</div>
     <div v-else-if="!items.length" class="hint">
-      {{ query ? '没有匹配的记录' : '还没有听写历史，按 F9 说几句就会出现在这里' }}
+      <template v-if="query">
+        没有匹配「{{ query }}」的记录
+        <button class="btn btn-sm" style="margin-left: 8px;" @click="query = ''; load()">清除搜索</button>
+      </template>
+      <template v-else>还没有听写历史，按 F9 说几句就会出现在这里</template>
     </div>
 
     <div v-else class="history-list">
@@ -31,8 +35,8 @@
           </div>
         </div>
         <div class="item-actions">
-          <button class="icon-btn" title="复制" @click="copy(it)">{{ copiedId === it.id ? '✓' : '复制' }}</button>
-          <button class="icon-btn danger" title="删除" @click="remove(it)">删除</button>
+          <button class="btn btn-sm" title="复制" @click="copy(it)">{{ copiedId === it.id ? '✓' : '复制' }}</button>
+          <button class="btn btn-sm btn-danger" title="删除" @click="remove(it)">删除</button>
         </div>
       </div>
     </div>
@@ -90,6 +94,13 @@ async function copy(it: HistoryItem) {
 
 async function remove(it: HistoryItem) {
   try {
+    await ElMessageBox.confirm('确定删除这条记录吗？', '删除记录', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消',
+    })
+  } catch {
+    return  // 用户取消
+  }
+  try {
     await api.deleteHistoryItem(it.id)
     items.value = items.value.filter(x => x.id !== it.id)
   } catch {
@@ -124,13 +135,6 @@ onMounted(load)
   border: 1px solid var(--border-base); border-radius: var(--radius-base); font-size: var(--font-sm);
 }
 .search:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--accent-tint); }
-.btn-clear {
-  padding: var(--space-sm) var(--space-md); border: 1px solid var(--border-base);
-  border-radius: var(--radius-base); background: white; cursor: pointer; font-size: var(--font-sm); white-space: nowrap;
-}
-.btn-clear:hover:not(:disabled) { border-color: var(--error-color); color: var(--error-color); }
-.btn-clear:disabled { opacity: 0.5; cursor: not-allowed; }
-
 .hint { text-align: center; color: var(--text-muted); padding: var(--space-xl); font-size: var(--font-sm); }
 
 .history-list { display: flex; flex-direction: column; gap: var(--space-sm); }
@@ -146,10 +150,4 @@ onMounted(load)
 .chars { color: var(--text-secondary); }
 
 .item-actions { display: flex; gap: var(--space-xs); flex-shrink: 0; }
-.icon-btn {
-  padding: 4px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-small);
-  background: var(--bg-secondary); cursor: pointer; font-size: var(--font-xs); color: var(--text-secondary);
-}
-.icon-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
-.icon-btn.danger:hover { border-color: var(--error-color); color: var(--error-color); }
 </style>

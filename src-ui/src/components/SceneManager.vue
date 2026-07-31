@@ -199,7 +199,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useApi } from '../composables/useApi'
 
 const api = useApi()
@@ -358,8 +358,12 @@ const saveScene = async () => {
 }
 
 const deleteScene = async (scene: Scene) => {
-  if (!confirm(`确定删除场景 "${scene.name}"？`)) {
-    return
+  try {
+    await ElMessageBox.confirm(`确定删除场景「${scene.name}」？`, '删除场景', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消',
+    })
+  } catch {
+    return  // 用户取消
   }
 
   try {
@@ -654,29 +658,6 @@ onMounted(() => {
 .badge-primary {
   background: var(--accent-tint);
   color: var(--primary-color);
-}
-
-.btn-icon {
-  padding: var(--space-xs);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-secondary);
-  border-radius: var(--radius-small);
-  transition: all var(--duration-fast) var(--ease-in-out);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-icon:hover {
-  background: var(--bg-secondary);
-  color: var(--primary-color);
-}
-
-.btn-icon.btn-danger:hover {
-  background: #fff1f0;
-  color: var(--error-color);
 }
 
 .form-row {

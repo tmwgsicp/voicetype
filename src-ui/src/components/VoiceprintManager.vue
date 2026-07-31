@@ -36,17 +36,17 @@
             <div class="empty-icon">🎙</div>
             <div class="empty-title">还没有声纹</div>
             <div class="empty-text">注册您的声纹后，系统将只识别您的声音</div>
-            <el-button type="primary" size="large" @click="showEnrollDialog = true">
+            <button class="btn btn-primary" @click="showEnrollDialog = true">
               注册声纹
-            </el-button>
+            </button>
           </div>
 
           <div v-else>
             <div class="section-header">
               <h3 class="form-section-title">已注册声纹 ({{ voiceprints.length }})</h3>
-              <el-button type="primary" size="small" @click="showEnrollDialog = true">
+              <button class="btn btn-sm btn-primary" @click="showEnrollDialog = true">
                 + 注册新声纹
-              </el-button>
+              </button>
             </div>
 
             <div class="voiceprints-list">
@@ -68,13 +68,11 @@
                       </div>
                     </div>
                   </div>
-                  <el-button
-                    type="danger"
-                    size="small"
-                    :icon="Delete"
-                    circle
+                  <button
+                    class="btn-icon btn-danger"
+                    title="删除"
                     @click="deleteVoiceprint(vp.speaker_id)"
-                  />
+                  >✕</button>
                 </div>
 
                 <div class="vp-body">
@@ -178,17 +176,17 @@
       </div>
 
       <template #footer>
-        <div v-if="enrollStep === 0">
-          <el-button @click="showEnrollDialog = false">取消</el-button>
-          <el-button type="primary" @click="startRecording" :disabled="!enrollData.speaker_id.trim()">
+        <div v-if="enrollStep === 0" class="dialog-btn-row">
+          <button class="btn" @click="showEnrollDialog = false">取消</button>
+          <button class="btn btn-primary" @click="startRecording" :disabled="!enrollData.speaker_id.trim()">
             {{ enrollRound === 1 ? '开始录音' : `继续第${enrollRound}轮` }}
-          </el-button>
+          </button>
         </div>
-        <div v-if="enrollStep === 1">
-          <el-button type="danger" @click="stopRecording">停止录音</el-button>
+        <div v-if="enrollStep === 1" class="dialog-btn-row">
+          <button class="btn btn-red" @click="stopRecording">停止录音</button>
         </div>
-        <div v-if="enrollStep === 3">
-          <el-button type="primary" @click="resetEnrollDialog">完成</el-button>
+        <div v-if="enrollStep === 3" class="dialog-btn-row">
+          <button class="btn btn-primary" @click="resetEnrollDialog">完成</button>
         </div>
       </template>
     </el-dialog>
@@ -198,7 +196,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Loading, SuccessFilled } from '@element-plus/icons-vue'
+import { Loading, SuccessFilled } from '@element-plus/icons-vue'
 import { useApi } from '../composables/useApi'
 
 const api = useApi()
@@ -460,7 +458,7 @@ watch(threshold, async (newValue) => {
 </script>
 
 <style scoped>
-:deep(.el-button) { border-radius: var(--radius-control) !important; }
+.dialog-btn-row { display: flex; justify-content: flex-end; gap: var(--space-sm); }
 :deep(.el-dialog) { border-radius: var(--radius-card) !important; }
 :deep(.el-slider__bar) { background: var(--accent) !important; }
 :deep(.el-switch.is-checked .el-switch__core) { background: var(--accent) !important; border-color: var(--accent) !important; }

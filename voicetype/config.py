@@ -131,6 +131,13 @@ class VoiceTypeConfig(BaseModel):
                     "默认 F8（紧挨 F9 听写，好记且各程序基本不占用）；避开 F10（会触发 Word 菜单）"
     )
 
+    # 文本编辑预设动作（可编辑）。为空 = 使用内置默认（见 pipeline/text_actions.py）。
+    # 每项：{id, label, hint, prompt}
+    text_actions: list[dict] = Field(
+        default_factory=list,
+        description="文本编辑菜单的预设动作，可增删改；为空则用内置默认"
+    )
+
     # Output
     typing_delay_ms: int = Field(default=5, description="Typing delay between chars (ms)")
 

@@ -316,10 +316,33 @@ fn show_edit_menu(handle: &AppHandle, cursor_x: i32, cursor_y: i32) {
         y = mon_y + 8;
     }
 
-    let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x, y)));
-    // 注意：不要 set_focus——菜单窗是非激活窗口（见 make_edit_menu_noactivate），
-    // 抢焦点会导致目标程序丢失选区，改写就变成插入而非替换。键盘由后端全局捕获。
-    let _ = win.show();
+    // Windows：用底层 SetWindowPos 以 SWP_NOACTIVATE 显示 + 定位，绝不激活本窗、
+    // 绝不碰目标程序焦点——这样目标程序的选区才不会丢，套用时粘贴才能正确「替换」。
+    // （Tauri 的 show()/set_position 在某些情况下仍会触发激活，导致选区丢失。）
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOSIZE, SWP_SHOWWINDOW,
+        };
+        if let Ok(hwnd) = win.hwnd() {
+            unsafe {
+                SetWindowPos(
+                    hwnd.0 as _,
+                    HWND_TOPMOST,
+                    x,
+                    y,
+                    0,
+                    0,
+                    SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOSIZE,
+                );
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x, y)));
+        let _ = win.show();
+    }
 }
 
 /// Connect to Python backend WebSocket and relay recording events to Tauri frontend.
@@ -347,7 +370,15 @@ async fn relay_ws_events(handle: &AppHandle, port: u16) {
                                 }
                                 Some("edit_menu_hide") => {
                                     if let Some(w) = handle.get_webview_window("edit-menu") {
-                                        let _ = w.hide();
+                                        #[cfg(windows)]
+                                        {
+                                            use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+                                            if let Ok(hwnd) = w.hwnd() {
+                                                unsafe { ShowWindow(hwnd.0 as _, SW_HIDE); }
+                                            }
+                                        }
+                                        #[cfg(not(windows))]
+                                        { let _ = w.hide(); }
                                     }
                                 }
                                 _ => {}

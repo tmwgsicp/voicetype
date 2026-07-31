@@ -15,7 +15,7 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..pipeline.text_actions import actions_for_menu
+from ..pipeline.text_actions import menu_view, normalize_actions, DEFAULT_ACTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,17 @@ def set_engine(engine):
 
 @edit_router.get("/actions")
 async def get_actions():
-    """返回预设动作清单（供前端菜单渲染）。"""
-    return {"actions": actions_for_menu()}
+    """返回当前生效的预设动作清单（菜单视图，供前端菜单渲染）。"""
+    if _engine:
+        return {"actions": _engine.get_menu_actions()}
+    return {"actions": menu_view(normalize_actions(None))}
+
+
+@edit_router.get("/actions/full")
+async def get_actions_full():
+    """返回完整动作（含 prompt，供设置页编辑）；同时给出内置默认供「恢复默认」。"""
+    actions = normalize_actions(_engine._text_actions if _engine else None)
+    return {"actions": actions, "defaults": [dict(a) for a in DEFAULT_ACTIONS]}
 
 
 class ApplyRequest(BaseModel):

@@ -68,7 +68,20 @@ async fn toggle_recording(state: tauri::State<'_, AppState>) -> Result<serde_jso
 #[tauri::command]
 fn hide_edit_menu(app: tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("edit-menu") {
-        let _ = w.hide();
+        // Windows：用底层 ShowWindow(SW_HIDE) 隐藏（因为显示走的是底层 SetWindowPos）
+        #[cfg(windows)]
+        {
+            use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+            if let Ok(hwnd) = w.hwnd() {
+                unsafe {
+                    ShowWindow(hwnd.0 as _, SW_HIDE);
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = w.hide();
+        }
     }
 }
 

@@ -219,6 +219,7 @@ async def lifespan(app: FastAPI):
         typing_delay_ms=config.typing_delay_ms,
         auto_scene_enabled=config.auto_scene_enabled,
         edit_hotkey=config.edit_hotkey,
+        text_actions=config.text_actions,
     )
     set_engine(engine)
     set_config_engine(engine)  # Set engine for config hot reload
