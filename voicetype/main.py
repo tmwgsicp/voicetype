@@ -220,6 +220,7 @@ async def lifespan(app: FastAPI):
         auto_scene_enabled=config.auto_scene_enabled,
         edit_hotkey=config.edit_hotkey,
         text_actions=config.text_actions,
+        reply_hotkey=config.reply_hotkey,
     )
     set_engine(engine)
     set_config_engine(engine)  # Set engine for config hot reload
@@ -317,6 +318,10 @@ def create_app() -> FastAPI:
         @app.get("/edit-menu.html")
         async def serve_edit_menu():
             return FileResponse(str(ui_dist / "edit-menu.html"))
+
+        @app.get("/reply.html")
+        async def serve_reply():
+            return FileResponse(str(ui_dist / "reply.html"))
 
     return app
 

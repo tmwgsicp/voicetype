@@ -14,6 +14,7 @@ export default defineConfig({
         main: './index.html',
         floating: './floating.html',
         'edit-menu': './edit-menu.html',
+        reply: './reply.html',
       },
     },
   },

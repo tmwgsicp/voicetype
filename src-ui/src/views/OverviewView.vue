@@ -123,7 +123,7 @@ onUnmounted(() => { if (poll) clearInterval(poll) })
   background: var(--bg-card); border-radius: var(--radius-card); padding: var(--space-lg);
   box-shadow: var(--shadow-card);
 }
-.stat-card.accent { background: linear-gradient(180deg, var(--accent-tint-strong), var(--bg-card)); }
+.stat-card.accent { background: var(--accent-tint); }
 .stat-value { font-size: 24px; font-weight: var(--weight-bold); color: var(--label); letter-spacing: -0.5px; }
 .stat-value .unit { font-size: 14px; font-weight: var(--weight-medium); color: var(--label-secondary); margin-left: 2px; }
 .stat-card.accent .stat-value { color: var(--accent); }

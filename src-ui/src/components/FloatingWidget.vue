@@ -250,10 +250,10 @@ html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
   background: #8c8c8c; align-self: center;
   transition: height 0.08s linear;
 }
-.capsule.recording .bar { background: linear-gradient(180deg, #ff7875, #ff4d4f); }
-.capsule.processing .bar { background: linear-gradient(180deg, #b37feb, #9254de); }
-.capsule.standby .bar { background: linear-gradient(180deg, #5cdbd3, #13c2c2); }
-.capsule.loading .bar { background: linear-gradient(180deg, #69c0ff, #1890ff); }
+.capsule.recording .bar { background: #ff4d4f; }
+.capsule.processing .bar { background: #9254de; }
+.capsule.standby .bar { background: #13c2c2; }
+.capsule.loading .bar { background: #1890ff; }
 
 .label {
   flex: 1; min-width: 0; overflow: hidden;

@@ -140,7 +140,7 @@ onMounted(load)
 .history-list { display: flex; flex-direction: column; gap: var(--space-sm); }
 .history-item {
   display: flex; align-items: flex-start; gap: var(--space-md);
-  background: white; border: 1px solid var(--border-light); border-radius: var(--radius-base);
+  background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-base);
   padding: var(--space-md); box-shadow: var(--shadow-light);
 }
 .item-main { flex: 1; min-width: 0; }

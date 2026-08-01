@@ -64,3 +64,29 @@ async def cancel():
         return {"status": "error", "message": "engine not ready"}
     await _engine.cancel_edit()
     return {"status": "ok"}
+
+
+class ReplyRequest(BaseModel):
+    context: str = ""
+    intent: str = ""
+    tone: str = "auto"
+
+
+@edit_router.post("/reply")
+async def compose_reply(req: ReplyRequest):
+    """地道回复：结合上下文+意图生成英文回复。"""
+    if not _engine:
+        return {"status": "error", "message": "engine not ready"}
+    reply = await _engine.pipeline.compose_reply(req.context, req.intent, req.tone)
+    if not reply:
+        return {"status": "error", "message": "生成失败，请检查 LLM 配置", "reply": ""}
+    return {"status": "ok", "reply": reply}
+
+
+@edit_router.post("/reply/cancel")
+async def reply_cancel():
+    """关闭回复助手窗口。"""
+    if not _engine:
+        return {"status": "error", "message": "engine not ready"}
+    await _engine.cancel_reply()
+    return {"status": "ok"}

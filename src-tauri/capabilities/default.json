@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/nicegui-dev/nicegui/main/crates/tauri-utils/schema/capability.json",
   "identifier": "default",
   "description": "Default capabilities for VoiceType",
-  "windows": ["main", "floating", "edit-menu"],
+  "windows": ["main", "floating", "edit-menu", "reply"],
   "permissions": [
     "core:default",
     "shell:allow-execute",

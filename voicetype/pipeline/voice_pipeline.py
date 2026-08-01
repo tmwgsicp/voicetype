@@ -234,6 +234,59 @@ class VoiceTypingPipeline:
             logger.error("Text action failed: %s", e)
             return selection
 
+    async def compose_reply(self, context: str, intent: str, tone: str = "auto") -> str:
+        """
+        地道回复助手：结合【对方消息=上下文】和【你的意图】，生成一条地道、贴合语气的英文回复。
+        context 可为空（纯从意图生成）；intent 可中文/粗英文。返回英文回复本身。
+        """
+        context = (context or "").strip()
+        intent = (intent or "").strip()
+        if not intent and not context:
+            return ""
+        if not self._llm_enabled or not self._client:
+            logger.warning("compose_reply: LLM not configured")
+            return ""
+
+        tone_map = {
+            "casual": "语气偏轻松随意（像 Slack 上和同事聊），可用缩写、口语连接词。",
+            "professional": "语气偏正式、专业、得体（适合正式邮件或与上级/客户），但不僵硬、不浮夸。",
+            "warm": "语气友好、热情、有人情味，但仍专业。",
+            "auto": "自动判断：仔细读上下文的语气和正式度，让回复与之匹配（对方随意你就随意，对方正式你就正式）。",
+        }
+        tone_instr = tone_map.get(tone, tone_map["auto"])
+
+        system_prompt = (
+            "你是帮助非英语母语者在国际远程团队里回复工作消息的助手（场景如 Slack、Teams、邮件）。"
+            "用户会给你【对方消息】(要回复的上下文，可能为空) 和【我的意图】(用户想表达什么，可能是中文或蹩脚英文)。"
+            "你要写出一条**英文回复**，要求：\n"
+            "1. 像英语母语的职场人自然写出来的——地道、流畅，用缩写和自然的连接词，绝不逐字直译、不生硬、不机械。\n"
+            "2. 贴合【对方消息】的语气和正式度；" + tone_instr + "\n"
+            "3. 简洁、直奔重点，不要多余寒暄或解释（除非上下文里那样才自然）。\n"
+            "4. 准确传达【我的意图】，并让它自然衔接对话。\n"
+            "只输出这条英文回复本身，不要解释、不要加引号、不要任何多余内容。"
+        )
+        user_msg = (
+            f"【对方消息】\n{context if context else '(无，直接根据我的意图写)'}\n\n"
+            f"【我的意图】\n{intent if intent else '(无，请根据上下文给出合适的回复)'}"
+        )
+        try:
+            resp = await self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.6,  # 回复要自然，给一点发挥空间
+                max_tokens=max(self._max_tokens, 512),
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            )
+            out = (resp.choices[0].message.content or "").strip()
+            logger.info("Reply composed: ctx=%d intent='%s' -> '%s'", len(context), intent[:40], out[:80])
+            return out
+        except Exception as e:
+            logger.error("compose_reply failed: %s", e)
+            return ""
+
     async def close(self):
         if self._client:
             await self._client.close()

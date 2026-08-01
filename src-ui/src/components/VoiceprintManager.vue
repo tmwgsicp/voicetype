@@ -86,9 +86,13 @@
                       :min="0.4"
                       :max="0.8"
                       :step="0.05"
-                      :marks="{ 0.4: '实战推荐', 0.5: '平衡', 0.6: '严格' }"
                       @change="(val: number) => updateThreshold(vp.speaker_id, val)"
                     />
+                    <div class="threshold-scale">
+                      <span>0.40 宽松</span>
+                      <span>0.60 平衡</span>
+                      <span>0.80 严格</span>
+                    </div>
                     <div class="threshold-hint">
                       推荐 0.40-0.45（实战）· 0.50+ 容易误伤本人 · 太高会拒绝口音变化
                     </div>
@@ -168,7 +172,7 @@
       <!-- Step 3: Success -->
       <div v-if="enrollStep === 3" class="enroll-content">
         <div class="success-ui">
-          <el-icon :size="64" color="#52c41a">
+          <el-icon :size="64" color="var(--green)">
             <SuccessFilled />
           </el-icon>
           <div class="success-text">声纹注册成功！</div>
@@ -474,7 +478,7 @@ watch(threshold, async (newValue) => {
 }
 
 .unified-card {
-  background: white;
+  background: var(--bg-card);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-large);
   box-shadow: var(--shadow-light);
@@ -519,7 +523,7 @@ watch(threshold, async (newValue) => {
   margin: var(--space-lg);
   border-radius: var(--radius-small);
   font-size: var(--font-sm);
-  color: #0050b3;
+  color: var(--label-secondary);
 }
 
 .form-section {
@@ -655,6 +659,14 @@ watch(threshold, async (newValue) => {
   font-size: var(--font-sm);
   color: var(--primary-color);
   font-weight: var(--font-semibold);
+}
+
+.threshold-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .threshold-hint {

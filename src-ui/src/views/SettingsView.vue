@@ -255,9 +255,15 @@
                   <input type="text" v-model="config.edit_hotkey" placeholder="<f8>">
                   <p class="form-help">选中文字后按它，弹预设动作菜单（默认 F8）</p>
                 </div>
+                <div class="form-group">
+                  <label>地道回复快捷键</label>
+                  <input type="text" v-model="config.reply_hotkey" placeholder="<f7>">
+                  <p class="form-help">选中对方消息后按它，弹回复助手（默认 F7）</p>
+                </div>
               </div>
               <div class="card-hint-block" style="margin: var(--space-md) 0 0;">
-                💡 文本编辑：在任意应用里选中一段文字，按「文本编辑快捷键」，光标旁会弹出预设动作菜单（翻译 / 润色 / 精简 / 正式 / 要点），按数字键 1-5 或点击即可就地改写替换。需已配置 LLM。
+                💡 文本编辑：选中文字按「文本编辑快捷键」，光标旁弹预设动作菜单（翻译 / 润色 / 精简 / 正式 / 要点），点击即可就地改写替换。<br>
+                💬 地道回复：选中对方消息按「地道回复快捷键」，弹回复助手，用中文写你想回什么，AI 结合上下文生成地道英文回复，复制后粘到聊天框。需已配置 LLM。
               </div>
             </div>
 
@@ -340,6 +346,7 @@ const config = reactive({
   llm_temperature: 0.3,
   hotkey: '<f9>',
   edit_hotkey: '<f8>',
+  reply_hotkey: '<f7>',
   auto_start_asr: false,
   auto_scene_enabled: true,
 })
@@ -567,7 +574,7 @@ onMounted(async () => {
 }
 
 .status-indicator.recording {
-  background: #fff1f0;
+  background: rgba(255, 59, 48, 0.1);
   border-color: var(--error-color);
   animation: pulse-border 2s ease-in-out infinite;
 }
@@ -580,7 +587,7 @@ onMounted(async () => {
 .status-dot {
   width: 8px;
   height: 8px;
-  background: #bfbfbf;
+  background: var(--label-tertiary);
   border-radius: 50%;
 }
 
@@ -649,8 +656,8 @@ onMounted(async () => {
 .switch-text > span { font-size: var(--text-body); color: var(--label); }
 .switch-text .form-help { margin-top: 2px; }
 
-.unified-card { 
-  background: white;
+.unified-card {
+  background: var(--bg-card);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-large);
   box-shadow: var(--shadow-light);
@@ -672,7 +679,7 @@ onMounted(async () => {
   margin: var(--space-lg);
   border-radius: var(--radius-small);
   font-size: var(--font-sm);
-  color: #0050b3;
+  color: var(--label-secondary);
 }
 
 .form-section { padding: var(--space-lg); border-bottom: 1px solid var(--border-light); }

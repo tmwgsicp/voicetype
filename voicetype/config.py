@@ -130,6 +130,11 @@ class VoiceTypeConfig(BaseModel):
         description="文本编辑快捷键：选中文字后按它，弹预设动作菜单就地改写（pynput 格式）。"
                     "默认 F8（紧挨 F9 听写，好记且各程序基本不占用）；避开 F10（会触发 Word 菜单）"
     )
+    reply_hotkey: str = Field(
+        default="<f7>",
+        description="地道回复快捷键：选中对方消息后按它，弹回复助手，结合上下文生成地道英文回复。"
+                    "默认 F7（F7 回复 / F8 改写 / F9 听写）"
+    )
 
     # 文本编辑预设动作（可编辑）。为空 = 使用内置默认（见 pipeline/text_actions.py）。
     # 每项：{id, label, hint, prompt}

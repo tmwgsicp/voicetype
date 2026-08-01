@@ -446,7 +446,7 @@ onMounted(() => {
 }
 
 .unified-card {
-  background: white;
+  background: var(--bg-card);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-large);
   box-shadow: var(--shadow-light);
@@ -472,7 +472,7 @@ onMounted(() => {
   margin: var(--space-lg);
   border-radius: var(--radius-small);
   font-size: var(--font-sm);
-  color: #0050b3;
+  color: var(--label-secondary);
 }
 
 .form-section {

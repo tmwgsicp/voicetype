@@ -86,6 +86,13 @@ fn hide_edit_menu(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+fn hide_reply_window(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("reply") {
+        let _ = w.hide();
+    }
+}
+
+#[tauri::command]
 fn show_main_window(app: tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -133,19 +140,24 @@ fn main() {
             get_status,
             show_main_window,
             hide_edit_menu,
+            hide_reply_window,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
 
-            // Build tray menu
-            let show_item = MenuItemBuilder::with_id("show", "Open Settings").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "Quit VoiceType").build(app)?;
+            // Build tray menu（中文，含悬浮窗显示/隐藏开关）
+            let show_item = MenuItemBuilder::with_id("show", "打开设置").build(app)?;
+            let toggle_float_item =
+                MenuItemBuilder::with_id("toggle_float", "隐藏悬浮窗").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "退出 VoiceType").build(app)?;
             let menu = MenuBuilder::new(app)
                 .item(&show_item)
+                .item(&toggle_float_item)
                 .separator()
                 .item(&quit_item)
                 .build()?;
 
+            let toggle_item_for_event = toggle_float_item.clone();
             TrayIconBuilder::new()
                 .tooltip("VoiceType")
                 .icon(app.default_window_icon().unwrap().clone())
@@ -157,6 +169,17 @@ fn main() {
                                 let _ = w.show();
                                 let _ = w.unminimize();
                                 let _ = w.set_focus();
+                            }
+                        }
+                        "toggle_float" => {
+                            if let Some(w) = app_handle.get_webview_window("floating") {
+                                if w.is_visible().unwrap_or(true) {
+                                    let _ = w.hide();
+                                    let _ = toggle_item_for_event.set_text("显示悬浮窗");
+                                } else {
+                                    let _ = w.show();
+                                    let _ = toggle_item_for_event.set_text("隐藏悬浮窗");
+                                }
                             }
                         }
                         "quit" => {

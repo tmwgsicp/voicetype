@@ -105,6 +105,42 @@
   --width-wide: 100%;
 }
 
+/* ---- 深色主题：跟随系统。只覆盖颜色 token，组件用 token 处自动变深 ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 强调色在深色下略提亮，浅底加强以看得见 */
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --accent-tint: rgba(10, 132, 255, 0.22);
+    --accent-tint-strong: rgba(10, 132, 255, 0.32);
+
+    --red: #ff453a;
+    --green: #32d74b;
+    --orange: #ff9f0a;
+
+    /* 文字层级（深色下反相） */
+    --label: #f5f5f7;
+    --label-secondary: rgba(235, 235, 245, 0.62);
+    --label-tertiary: rgba(235, 235, 245, 0.4);
+    --label-quaternary: rgba(235, 235, 245, 0.28);
+
+    /* 背景分层：窗口 < 内容 < 卡片（越靠前越亮，营造深度） */
+    --bg-window: #1c1c1e;
+    --bg-sidebar: rgba(30, 30, 32, 0.72);
+    --bg-content: #1c1c1e;
+    --bg-card: #2c2c2e;
+    --bg-fill: rgba(120, 120, 128, 0.24);
+    --bg-fill-hover: rgba(120, 120, 128, 0.36);
+
+    --separator: rgba(255, 255, 255, 0.12);
+    --separator-opaque: #3a3a3c;
+
+    /* 阴影在深色下加重才看得出层次 */
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.5);
+    --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.6);
+  }
+}
+
 * { box-sizing: border-box; }
 
 html, body, #app { height: 100%; margin: 0; }

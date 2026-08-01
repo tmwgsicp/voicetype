@@ -142,10 +142,10 @@ onMounted(async () => {
 
 .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md); }
 .stat-card {
-  background: white; border: 1px solid var(--border-light); border-radius: var(--radius-large);
+  background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-large);
   padding: var(--space-lg); text-align: center; box-shadow: var(--shadow-light);
 }
-.stat-card.highlight { background: linear-gradient(135deg, var(--accent-tint), var(--accent-tint-strong)); border-color: var(--accent-tint-strong); }
+.stat-card.highlight { background: var(--accent-tint); border-color: var(--accent-tint-strong); }
 .stat-value { font-size: 26px; font-weight: 700; color: var(--primary-color); line-height: 1.2; }
 .stat-label { font-size: var(--font-xs); color: var(--text-secondary); margin-top: 6px; }
 
@@ -153,7 +153,7 @@ onMounted(async () => {
   font-size: var(--font-sm); color: var(--text-secondary); }
 .mini-stats b { color: var(--text-primary); }
 
-.unified-card { background: white; border: 1px solid var(--border-light); border-radius: var(--radius-large);
+.unified-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-large);
   box-shadow: var(--shadow-light); overflow: hidden; }
 .card-header { padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--border-light);
   display: flex; justify-content: space-between; align-items: center; }
@@ -162,7 +162,7 @@ onMounted(async () => {
 
 .chart { display: flex; align-items: flex-end; gap: 3px; height: 140px; padding: var(--space-lg) var(--space-lg) var(--space-sm); }
 .bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; }
-.bar { width: 100%; background: linear-gradient(180deg, var(--accent), var(--accent-hover)); border-radius: 3px 3px 0 0;
+.bar { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0;
   transition: height 0.3s var(--ease-in-out); min-height: 2px; }
 .bar.empty { background: var(--border-light); }
 .chart-axis { display: flex; justify-content: space-between; padding: 0 var(--space-lg) var(--space-md);
@@ -172,7 +172,7 @@ onMounted(async () => {
 .scene-row { display: flex; align-items: center; gap: var(--space-md); }
 .scene-name { width: 64px; font-size: var(--font-sm); color: var(--text-primary); }
 .scene-track { flex: 1; height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; }
-.scene-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-hover)); border-radius: 5px; }
+.scene-fill { height: 100%; background: var(--accent); border-radius: 5px; }
 .scene-num { width: 80px; text-align: right; font-size: var(--font-xs); color: var(--text-secondary); }
 
 .empty-hint { text-align: center; color: var(--text-muted); padding: var(--space-xl); font-size: var(--font-sm); }

@@ -252,21 +252,27 @@ fn show_windows(handle: &AppHandle) {
     }
     if let Some(float_win) = handle.get_webview_window("floating") {
         let _ = float_win.show();
-        // Position floating window at horizontal center, lower portion (above taskbar)
-        if let Some(main_win) = handle.get_webview_window("main") {
-            if let Ok(monitor) = main_win.current_monitor() {
-                if let Some(monitor) = monitor {
-                    let size = monitor.size();
-                    // 水平居中（胶囊窗口宽 320）
-                    let x = (size.width as i32 - 320) / 2;
-                    // 胶囊窗口高 52，距底部约 90px（留空间给任务栏）
-                    let y = size.height as i32 - 52 - 90;
-                    let _ = float_win.set_position(tauri::Position::Physical(
-                        tauri::PhysicalPosition::new(x, y),
-                    ));
-                }
-            }
-        }
+        position_floating(&float_win);
+    }
+}
+
+/// 把悬浮窗放到当前显示器的「水平居中、靠下」（用窗口真实物理尺寸，兼容高分屏缩放）。
+fn position_floating(float_win: &tauri::WebviewWindow) {
+    // 窗口真实物理尺寸（缩放后 320 逻辑宽可能是 480 物理宽，硬编码会算偏）
+    let (win_w, win_h) = float_win
+        .outer_size()
+        .map(|s| (s.width as i32, s.height as i32))
+        .unwrap_or((320, 52));
+    if let Ok(Some(monitor)) = float_win.current_monitor() {
+        let msize = monitor.size();
+        let mpos = monitor.position();
+        // 水平居中
+        let x = mpos.x + (msize.width as i32 - win_w) / 2;
+        // 靠下：距底部约 90px（给任务栏留空间）
+        let y = mpos.y + msize.height as i32 - win_h - 90;
+        let _ = float_win.set_position(tauri::Position::Physical(
+            tauri::PhysicalPosition::new(x, y),
+        ));
     }
 }
 
@@ -379,6 +385,19 @@ async fn relay_ws_events(handle: &AppHandle, port: u16) {
                                         }
                                         #[cfg(not(windows))]
                                         { let _ = w.hide(); }
+                                    }
+                                }
+                                Some("reply_compose_show") => {
+                                    // 回复助手是可获焦窗口（要打字）：居中、显示、抢焦点
+                                    if let Some(w) = handle.get_webview_window("reply") {
+                                        let _ = w.center();
+                                        let _ = w.show();
+                                        let _ = w.set_focus();
+                                    }
+                                }
+                                Some("reply_compose_hide") => {
+                                    if let Some(w) = handle.get_webview_window("reply") {
+                                        let _ = w.hide();
                                     }
                                 }
                                 _ => {}

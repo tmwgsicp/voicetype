@@ -81,6 +81,7 @@ class VoiceTypingEngine:
         auto_scene_enabled: bool = True,
         edit_hotkey: str = "<f10>",
         text_actions: list = None,
+        reply_hotkey: str = "<f7>",
     ):
         """
         Initialize VoiceTypingEngine.
@@ -188,6 +189,15 @@ class VoiceTypingEngine:
         self.edit_hotkey_listener = HotkeyListener(
             hotkey=edit_hotkey,
             on_activate=self._start_edit,
+            on_deactivate=None,
+            is_active_fn=lambda: False,
+        )
+
+        # 地道回复快捷键（选中对方消息后按它，弹回复助手，结合上下文生成英文回复）
+        self._reply_hotkey = reply_hotkey
+        self.reply_hotkey_listener = HotkeyListener(
+            hotkey=reply_hotkey,
+            on_activate=self._start_reply,
             on_deactivate=None,
             is_active_fn=lambda: False,
         )
@@ -312,7 +322,8 @@ class VoiceTypingEngine:
         await self.window_watcher.start()
         await self.hotkey_listener.start()
         await self.edit_hotkey_listener.start()
-        
+        await self.reply_hotkey_listener.start()
+
         # 启动KWS（如果启用）
         if self._kws_ext:
             try:
@@ -347,6 +358,7 @@ class VoiceTypingEngine:
             await self.stop_recording()
         await self.hotkey_listener.stop()
         await self.edit_hotkey_listener.stop()
+        await self.reply_hotkey_listener.stop()
         await self.window_watcher.stop()
         await self.keyboard_output.stop()
         await self.pipeline.close()
@@ -1090,6 +1102,39 @@ class VoiceTypingEngine:
         self._edit_menu_open = False
         await self._broadcast({"type": "edit_menu_hide"})
         logger.info("Edit menu: cancelled")
+
+    async def _start_reply(self):
+        """地道回复入口：抓当前选中的对方消息当上下文，广播事件打开回复助手窗（可为空）。"""
+        if self._is_recording:
+            return
+        try:
+            selection = await self.keyboard_output.get_selection()
+        except Exception:
+            selection = ""
+        context = (selection or "").strip()
+        logger.info("Reply composer: context %d chars", len(context))
+        await self._broadcast({"type": "reply_compose_show", "context": context})
+
+    async def cancel_reply(self):
+        """关闭回复助手窗口。"""
+        await self._broadcast({"type": "reply_compose_hide"})
+        logger.info("Reply composer: closed")
+
+    async def reload_reply_hotkey(self, reply_hotkey: str):
+        """热重载地道回复快捷键。"""
+        try:
+            await self.reply_hotkey_listener.stop()
+        except Exception as e:
+            logger.warning("Stop old reply hotkey listener failed: %s", e)
+        self._reply_hotkey = reply_hotkey
+        self.reply_hotkey_listener = HotkeyListener(
+            hotkey=reply_hotkey,
+            on_activate=self._start_reply,
+            on_deactivate=None,
+            is_active_fn=lambda: False,
+        )
+        await self.reply_hotkey_listener.start()
+        logger.info("Reply hotkey reloaded: %s", reply_hotkey)
 
     def _arm_edit_timeout(self):
         """安全兜底：菜单弹出后 12s 内没操作就自动收起（避免菜单一直悬在屏幕上）。"""

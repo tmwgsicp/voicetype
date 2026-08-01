@@ -1,6 +1,6 @@
 {
   "name": "voicetype",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Lightweight AI voice input tool with real-time ASR and scene adaptation",
   "private": true,
   "scripts": {

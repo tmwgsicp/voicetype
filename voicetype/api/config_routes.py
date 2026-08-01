@@ -49,6 +49,7 @@ class ConfigResponse(BaseModel):
     llm_temperature: float
     hotkey: str
     edit_hotkey: str
+    reply_hotkey: str
     text_actions: list[dict]
     typing_delay_ms: int
     host: str
@@ -100,6 +101,7 @@ class ConfigUpdate(BaseModel):
     llm_temperature: Optional[float] = None
     hotkey: Optional[str] = None
     edit_hotkey: Optional[str] = None
+    reply_hotkey: Optional[str] = None
     text_actions: Optional[list[dict]] = None
     typing_delay_ms: Optional[int] = None
     auto_start_asr: Optional[bool] = None
@@ -158,6 +160,14 @@ async def update_config(update: ConfigUpdate):
             asyncio.create_task(_engine_instance.reload_edit_hotkey(_current_config.edit_hotkey))
         except Exception as e:
             logger.error("Failed to reload edit hotkey: %s", e)
+
+    # 热重载地道回复快捷键
+    if "reply_hotkey" in updates and _engine_instance:
+        try:
+            import asyncio
+            asyncio.create_task(_engine_instance.reload_reply_hotkey(_current_config.reply_hotkey))
+        except Exception as e:
+            logger.error("Failed to reload reply hotkey: %s", e)
 
     # 热重载预设文本动作（增删改即时生效）
     if "text_actions" in updates and _engine_instance:
